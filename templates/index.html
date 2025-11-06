@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>League of Legends Stats Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #010A13 0%, #0A1428 50%, #1E2328 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin-top: 50px;
+        }
+        .card {
+            background: #1E2328;
+            border: 2px solid #C79B3B;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(199, 155, 59, 0.3);
+            color: #E4E1D8;
+        }
+        .card-body {
+            background: #1E2328;
+            border-radius: 15px;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #C79B3B;
+        }
+        .form-label {
+            color: #C79B3B;
+            font-weight: 600;
+        }
+        .form-control, .form-select {
+            background: #0A1428;
+            border: 2px solid #C79B3B;
+            color: #E4E1D8;
+        }
+        .form-control:focus, .form-select:focus {
+            background: #0A1428;
+            border-color: #D4AF37;
+            box-shadow: 0 0 0 0.25rem rgba(199, 155, 59, 0.25);
+            color: #E4E1D8;
+        }
+        .form-control::placeholder {
+            color: #786641;
+        }
+        .form-text {
+            color: #A09B8C;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #C79B3B 0%, #D4AF37 100%);
+            border: none;
+            color: #0A1428;
+            font-weight: bold;
+            padding: 12px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #D4AF37 0%, #C79B3B 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(199, 155, 59, 0.4);
+        }
+        .champion-icon {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 3px solid #C79B3B;
+            box-shadow: 0 0 15px rgba(199, 155, 59, 0.5);
+        }
+        .loading {
+            display: none;
+        }
+        .result-section {
+            display: none;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #0A1428 0%, #1E2328 100%);
+            border: 2px solid #C79B3B;
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+            box-shadow: 0 5px 15px rgba(199, 155, 59, 0.2);
+        }
+        .stat-card h5 {
+            color: #C79B3B;
+            margin-bottom: 10px;
+        }
+        .stat-card h2 {
+            color: #D4AF37;
+        }
+        .profile-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid #C79B3B;
+            box-shadow: 0 0 15px rgba(199, 155, 59, 0.5);
+        }
+        .list-group-item {
+            background: #0A1428;
+            border: 1px solid #C79B3B;
+            color: #E4E1D8;
+            margin-bottom: 5px;
+            border-radius: 5px;
+        }
+        .list-group-item h6 {
+            color: #D4AF37;
+        }
+        .list-group-item small {
+            color: #A09B8C;
+        }
+        .list-group-item img {
+            border: 2px solid #C79B3B;
+        }
+        .alert-danger {
+            background: #3C1F1F;
+            border: 2px solid #C73B3B;
+            color: #E4E1D8;
+        }
+        .spinner-border {
+            color: #C79B3B !important;
+        }
+        .text-muted {
+            color: #A09B8C !important;
+        }
+        option {
+            background: #0A1428;
+            color: #E4E1D8;
+        }
+        .match-card {
+            background: #0A1428;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .match-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(199, 155, 59, 0.3);
+        }
+        .bg-success {
+            background-color: #1a7f37 !important;
+        }
+        .bg-danger {
+            background-color: #a72e2e !important;
+        }
+        .bg-opacity-10 {
+            background-color: rgba(26, 127, 55, 0.1) !important;
+        }
+        .bg-danger.bg-opacity-10 {
+            background-color: rgba(167, 46, 46, 0.1) !important;
+        }
+        .border-success {
+            border-color: #1a7f37 !important;
+        }
+        .border-danger {
+            border-color: #a72e2e !important;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 10px 30px rgba(199, 155, 59, 0.4);
+            }
+            50% {
+                transform: scale(1.02);
+                box-shadow: 0 15px 40px rgba(255, 215, 0, 0.6);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-body p-4">
+                <h1 class="text-center mb-4">League of Legends Stats Viewer</h1>
+
+                <form id="summonerForm">
+                    <div class="mb-3">
+                        <label for="gameName" class="form-label">Riot ID (Game Name)</label>
+                        <input type="text" class="form-control" id="gameName" placeholder="e.g., PlayerName" required>
+                        <small class="form-text text-muted">Enter your Riot ID without the tag</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="tagLine" class="form-label">Tag Line</label>
+                        <input type="text" class="form-control" id="tagLine" placeholder="e.g., NA1" required>
+                        <small class="form-text text-muted">Enter your tag line (the part after #)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="region" class="form-label">Region</label>
+                        <select class="form-select" id="region" required>
+                            <option value="na1">NA (North America)</option>
+                            <option value="euw1">EUW (Europe West)</option>
+                            <option value="eun1">EUNE (Europe Nordic & East)</option>
+                            <option value="kr">KR (Korea)</option>
+                            <option value="br1">BR (Brazil)</option>
+                            <option value="la1">LAN (Latin America North)</option>
+                            <option value="la2">LAS (Latin America South)</option>
+                            <option value="oc1">OCE (Oceania)</option>
+                            <option value="tr1">TR (Turkey)</option>
+                            <option value="ru">RU (Russia)</option>
+                            <option value="jp1">JP (Japan)</option>
+                            <option value="ph2">PH (Philippines)</option>
+                            <option value="sg2">SG (Singapore)</option>
+                            <option value="th2">TH (Thailand)</option>
+                            <option value="tw2">TW (Taiwan)</option>
+                            <option value="vn2">VN (Vietnam)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Get Stats</button>
+                </form>
+
+                <div class="loading text-center mt-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2" style="color: #C79B3B;">Fetching summoner data and match history...</p>
+                </div>
+
+                <div class="result-section mt-4">
+                    <div class="alert alert-danger error-message" style="display: none;"></div>
+
+                    <div class="summoner-info text-center mb-4">
+                        <img id="profileIcon" class="profile-icon mb-3" src="" alt="Profile Icon">
+                        <h3 id="summonerName"></h3>
+                        <p class="text-muted">Level: <span id="summonerLevel"></span></p>
+                    </div>
+
+                    <!-- Year in Review CTA -->
+                    <div class="text-center my-4">
+                        <a href="/year-in-review" class="btn btn-warning btn-lg" style="
+                            background: linear-gradient(135deg, #C79B3B 0%, #FFD700 100%);
+                            border: none;
+                            color: #0A1428;
+                            font-weight: bold;
+                            font-size: 1.5rem;
+                            padding: 20px 50px;
+                            border-radius: 50px;
+                            text-decoration: none;
+                            display: inline-block;
+                            transition: all 0.3s ease;
+                            box-shadow: 0 10px 30px rgba(199, 155, 59, 0.4);
+                            animation: pulse 2s ease-in-out infinite;
+                        " onmouseover="this.style.transform='translateY(-5px) scale(1.05)'; this.style.boxShadow='0 15px 40px rgba(255, 215, 0, 0.6)';" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 10px 30px rgba(199, 155, 59, 0.4)';">
+                            🎉 View Your 2024 Year in Review 🎉
+                        </a>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="stat-card text-center">
+                                <h5>Total Games (Recent 20)</h5>
+                                <h2 id="totalGames">0</h2>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="stat-card text-center">
+                                <h5>Summoner Level</h5>
+                                <h2 id="levelDisplay">0</h2>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-4">
+                        <div class="card-body">
+                            <h4 class="card-title mb-3">Most Played Champion</h4>
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    <img id="championIcon" class="champion-icon" src="" alt="Champion Icon">
+                                </div>
+                                <div class="col">
+                                    <h5 id="championName">-</h5>
+                                    <p class="mb-1">Mastery Level: <span id="championLevel">0</span></p>
+                                    <p class="mb-0">Mastery Points: <span id="championPoints">0</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-4">
+                        <div class="card-body">
+                            <h4 class="card-title mb-3">Top 5 Champions by Mastery</h4>
+                            <div id="topChampions" class="list-group">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-4">
+                        <div class="card-body">
+                            <h4 class="card-title mb-3">Recent Match History (Last 10 Games)</h4>
+                            <div id="recentMatches">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
