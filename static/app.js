@@ -209,7 +209,16 @@ $(document).ready(function() {
     }
 
     function showError(message) {
-        $('.error-message').text(message).show();
+        const errorHtml = `
+            <strong>Error:</strong> ${message}
+            <hr style="margin: 15px 0; border-color: #C79B3B;">
+            <div style="margin-top: 10px;">
+                <a href="mailto:m@sveder.com" style="color: #D4AF37; text-decoration: underline;">Contact us for support</a>
+                <span style="margin: 0 10px; color: #786641;">|</span>
+                <a href="/" style="color: #D4AF37; text-decoration: underline;">Back to form</a>
+            </div>
+        `;
+        $('.error-message').html(errorHtml).show();
         $('.result-section').show();
     }
 });

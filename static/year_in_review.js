@@ -183,8 +183,17 @@ function generateYearInReview(summonerData) {
             console.error('[YEAR IN REVIEW] Status:', xhr.status);
             console.error('[YEAR IN REVIEW] Response:', xhr.responseText);
 
-            document.getElementById('loadingOverlay').innerHTML =
-                '<p style="color: #C73B3B; font-size: 1.5rem;">Error generating review. Please try again.</p>';
+            document.getElementById('loadingOverlay').innerHTML = `
+                <div style="max-width: 600px; margin: 0 auto; padding: 30px; background: #1E2328; border: 2px solid #C73B3B; border-radius: 15px;">
+                    <p style="color: #C73B3B; font-size: 1.5rem; margin-bottom: 20px;">Error generating review</p>
+                    <p style="color: #E4E1D8; margin-bottom: 20px;">Please try again or contact us if the problem persists.</p>
+                    <hr style="margin: 20px 0; border-color: #C79B3B;">
+                    <div style="margin-top: 20px;">
+                        <a href="mailto:m@sveder.com" style="color: #D4AF37; text-decoration: underline; margin-right: 20px;">Contact support</a>
+                        <a href="/" style="color: #D4AF37; text-decoration: underline;">Back to form</a>
+                    </div>
+                </div>
+            `;
         }
     });
 }

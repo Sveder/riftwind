@@ -8,6 +8,15 @@ from flask_caching import Cache
 from functools import lru_cache
 import time
 import hashlib
+import boto3
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://faf6e4c2356f87cfc145dcf4b725d0a9@o630775.ingest.us.sentry.io/4510320357212160",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
 
 app = Flask(__name__)
 
@@ -88,7 +97,7 @@ def cached_get(url, headers_tuple):
 
 # You need to get your API key from https://developer.riotgames.com/
 RIOT_API_KEY = os.environ.get('RIOT_API_KEY', 'YOUR_API_KEY_HERE')
-RIOT_API_KEY = "RGAPI-95765231-7c4f-4f44-a579-cfa99cb036cf"
+RIOT_API_KEY = "RGAPI-919b971a-d901-4382-a771-9cad5515b5dd"
 
 # Regional routing values
 REGION_ROUTING = {
@@ -127,6 +136,33 @@ def get_summoner_data():
         game_name = data.get('gameName')
         tag_line = data.get('tagLine')
         region = data.get('region', 'na1').lower()
+
+        # Get user IP and timestamp for logging
+        user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        search_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Send email notification about search
+        try:
+            ses_client = boto3.client('ses', region_name='eu-central-1')
+            email_body = f"""
+New search performed on Riftwind:
+
+User: {game_name}#{tag_line}
+Region: {region}
+IP Address: {user_ip}
+Timestamp: {search_time}
+"""
+            ses_client.send_email(
+                Source='m@sveder.com',
+                Destination={'ToAddresses': ['m@sveder.com']},
+                Message={
+                    'Subject': {'Data': f'Riftwind Search: {game_name}#{tag_line}'},
+                    'Body': {'Text': {'Data': email_body}}
+                }
+            )
+            print(f"[EMAIL] Notification sent for {game_name}#{tag_line} from {user_ip}")
+        except Exception as email_error:
+            print(f"[EMAIL] Failed to send notification: {email_error}")
 
         if not game_name or not tag_line:
             return jsonify({'error': 'Game name and tag line are required'}), 400
@@ -184,29 +220,44 @@ def get_summoner_data():
         start_2025 = int(datetime(2025, 1, 1).timestamp())
         end_2025 = int(datetime(2025, 12, 31, 23, 59, 59).timestamp())
 
-        match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?startTime={start_2025}&endTime={end_2025}&start=0&count=100'
-        print(f"[MATCH API] URL: {match_url}")
-        print(f"[MATCH API] Filtering for 2025: {start_2025} to {end_2025}")
+        # Fetch matches in batches (max 100 per request, fetch up to 1000 total)
+        match_ids = []
+        matches_per_batch = 100
+        max_matches = 1000
 
-        # Try cache first
-        match_ids_data = cached_request(match_url, headers)
-        if match_ids_data is None:
-            match_response = requests.get(match_url, headers=headers)
-            print(f"[MATCH API] Status Code: {match_response.status_code}")
+        for start_index in range(0, max_matches, matches_per_batch):
+            match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?startTime={start_2025}&endTime={end_2025}&start={start_index}&count={matches_per_batch}'
+            print(f"[MATCH API] Fetching batch starting at {start_index}, URL: {match_url[:100]}...")
 
-            if match_response.status_code == 200:
-                match_ids_data = match_response.json()
-            else:
-                print(f"[MATCH API] Failed with status {match_response.status_code}")
-                match_ids_data = []
+            # Try cache first
+            match_ids_batch = cached_request(match_url, headers)
+            if match_ids_batch is None:
+                match_response = requests.get(match_url, headers=headers)
+                print(f"[MATCH API] Status Code: {match_response.status_code}")
 
-        match_ids = match_ids_data if isinstance(match_ids_data, list) else []
+                if match_response.status_code == 200:
+                    match_ids_batch = match_response.json()
+                else:
+                    print(f"[MATCH API] Failed with status {match_response.status_code}")
+                    break
+
+            if not match_ids_batch or len(match_ids_batch) == 0:
+                print(f"[MATCH API] No more matches available")
+                break
+
+            match_ids.extend(match_ids_batch)
+            print(f"[MATCH API] Retrieved {len(match_ids_batch)} matches in this batch, total so far: {len(match_ids)}")
+
+            # If we got fewer matches than requested, we've reached the end
+            if len(match_ids_batch) < matches_per_batch:
+                break
+
         total_games = len(match_ids)
-        print(f"[MATCH API] Retrieved {total_games} match IDs from 2025")
+        print(f"[MATCH API] Retrieved {total_games} total match IDs from 2025")
 
-        # Step 5: Get detailed match data - fetch 50 for comprehensive analysis
+        # Step 5: Get detailed match data - fetch 1000 for comprehensive analysis
         match_details = []
-        matches_to_fetch = match_ids[:50]
+        matches_to_fetch = match_ids[:1000]
         print(f"[MATCH DETAILS] Fetching details for {len(matches_to_fetch)} matches")
 
         for i, match_id in enumerate(matches_to_fetch):
@@ -541,7 +592,7 @@ def submit_feedback():
         print(f"[FEEDBACK] Received feedback from: {email}")
 
         # Send email via AWS SES
-        ses_client = boto3.client('ses', region_name='us-east-1')
+        ses_client = boto3.client('ses', region_name='eu-central-1')
 
         subject = f"Riftwind Feedback from {email}"
         body = f"""

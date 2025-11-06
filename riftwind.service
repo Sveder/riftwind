@@ -8,7 +8,7 @@ User=sveder
 Group=users
 WorkingDirectory=/home/sveder/rift/riftwind
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-Environment="RIOT_API_KEY=RGAPI-95765231-7c4f-4f44-a579-cfa99cb036cf"
+Environment="RIOT_API_KEY=RGAPI-919b971a-d901-4382-a771-9cad5515b5dd"
 ExecStart=/usr/bin/python3 /home/sveder/.local/bin/gunicorn -c gunicorn_config.py app:app
 Restart=always
 RestartSec=10
