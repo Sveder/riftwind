@@ -6,6 +6,8 @@ from datetime import datetime
 from analysis_engine import YearInReviewAnalyzer
 from flask_caching import Cache
 from functools import lru_cache
+import time
+import hashlib
 
 app = Flask(__name__)
 
@@ -18,6 +20,63 @@ app.config.from_mapping(cache_config)
 cache = Cache(app)
 
 print("[CACHE] Flask caching initialized")
+
+# Filesystem cache configuration
+CACHE_DIR = os.path.join(os.path.dirname(__file__), 'api_cache')
+CACHE_DURATION = 3600  # 1 hour cache
+
+# Create cache directory if it doesn't exist
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
+    print(f"[CACHE] Created cache directory: {CACHE_DIR}")
+
+def get_cache_key(url, params=None):
+    """Generate cache key from URL and params"""
+    cache_string = url
+    if params:
+        cache_string += json.dumps(params, sort_keys=True)
+    return hashlib.md5(cache_string.encode()).hexdigest()
+
+def get_from_cache(cache_key):
+    """Get data from filesystem cache"""
+    cache_file = os.path.join(CACHE_DIR, f"{cache_key}.json")
+    if os.path.exists(cache_file):
+        # Check if cache is still valid
+        file_age = time.time() - os.path.getmtime(cache_file)
+        if file_age < CACHE_DURATION:
+            with open(cache_file, 'r') as f:
+                print(f"[CACHE] Cache HIT for {cache_key}")
+                return json.load(f)
+        else:
+            print(f"[CACHE] Cache EXPIRED for {cache_key}")
+    return None
+
+def save_to_cache(cache_key, data):
+    """Save data to filesystem cache"""
+    cache_file = os.path.join(CACHE_DIR, f"{cache_key}.json")
+    with open(cache_file, 'w') as f:
+        json.dump(data, f)
+    print(f"[CACHE] Saved to cache: {cache_key}")
+
+def cached_request(url, headers):
+    """Make a cached HTTP request"""
+    cache_key = get_cache_key(url, headers)
+
+    # Try to get from cache first
+    cached_data = get_from_cache(cache_key)
+    if cached_data:
+        return cached_data
+
+    # If not in cache, make request
+    print(f"[CACHE] Cache MISS - fetching from network: {url[:80]}...")
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        data = response.json()
+        save_to_cache(cache_key, data)
+        return data
+
+    return None
 
 # Create a cached requests session
 @lru_cache(maxsize=128)
@@ -120,39 +179,53 @@ def get_summoner_data():
         else:
             print(f"[MASTERY API] Failed with status {mastery_response.status_code}")
 
-        # Step 4: Get match history IDs - FULL YEAR (100 matches for year-in-review)
-        match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?start=0&count=100'
+        # Step 4: Get match history IDs with 2025 filter
+        # Calculate 2025 timestamp range (Jan 1, 2025 00:00:00 UTC to Dec 31, 2025 23:59:59 UTC)
+        start_2025 = int(datetime(2025, 1, 1).timestamp())
+        end_2025 = int(datetime(2025, 12, 31, 23, 59, 59).timestamp())
+
+        match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?startTime={start_2025}&endTime={end_2025}&start=0&count=100'
         print(f"[MATCH API] URL: {match_url}")
+        print(f"[MATCH API] Filtering for 2025: {start_2025} to {end_2025}")
 
-        match_response = requests.get(match_url, headers=headers)
-        print(f"[MATCH API] Status Code: {match_response.status_code}")
-        print(f"[MATCH API] Response: {match_response.text[:500]}")  # First 500 chars
+        # Try cache first
+        match_ids_data = cached_request(match_url, headers)
+        if match_ids_data is None:
+            match_response = requests.get(match_url, headers=headers)
+            print(f"[MATCH API] Status Code: {match_response.status_code}")
 
-        total_games = 0
-        match_ids = []
-        if match_response.status_code == 200:
-            match_ids = match_response.json()
-            total_games = len(match_ids)
-            print(f"[MATCH API] Retrieved {total_games} match IDs for year-in-review")
-        else:
-            print(f"[MATCH API] Failed with status {match_response.status_code}")
+            if match_response.status_code == 200:
+                match_ids_data = match_response.json()
+            else:
+                print(f"[MATCH API] Failed with status {match_response.status_code}")
+                match_ids_data = []
 
-        # Step 5: Get detailed match data for FULL YEAR (all matches for comprehensive analysis)
+        match_ids = match_ids_data if isinstance(match_ids_data, list) else []
+        total_games = len(match_ids)
+        print(f"[MATCH API] Retrieved {total_games} match IDs from 2025")
+
+        # Step 5: Get detailed match data - fetch 50 for comprehensive analysis
         match_details = []
-        matches_to_fetch = match_ids[:50]  # Fetch 50 matches for year-in-review (balance speed vs data)
-        print(f"[MATCH DETAILS] Fetching details for {len(matches_to_fetch)} matches for year-in-review analysis")
+        matches_to_fetch = match_ids[:50]
+        print(f"[MATCH DETAILS] Fetching details for {len(matches_to_fetch)} matches")
 
         for i, match_id in enumerate(matches_to_fetch):
             match_detail_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{match_id}'
             print(f"[MATCH DETAILS] Fetching match {i+1}/{len(matches_to_fetch)}: {match_id}")
 
-            detail_response = requests.get(match_detail_url, headers=headers)
-            if detail_response.status_code == 200:
-                match_data = detail_response.json()
+            # Try cache first
+            match_data = cached_request(match_detail_url, headers)
+            if match_data is None:
+                detail_response = requests.get(match_detail_url, headers=headers)
+                if detail_response.status_code == 200:
+                    match_data = detail_response.json()
+                    print(f"[MATCH DETAILS] Successfully fetched match {match_id}")
+                else:
+                    print(f"[MATCH DETAILS] Failed to fetch match {match_id}: {detail_response.status_code}")
+                    continue
+
+            if match_data:
                 match_details.append(match_data)
-                print(f"[MATCH DETAILS] Successfully fetched match {match_id}")
-            else:
-                print(f"[MATCH DETAILS] Failed to fetch match {match_id}: {detail_response.status_code}")
 
         print(f"[MATCH DETAILS] Total matches fetched: {len(match_details)}")
 
@@ -358,6 +431,48 @@ def get_summoner_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/preview-stats', methods=['POST'])
+def get_preview_stats():
+    """Get quick preview stats from first 10 matches"""
+    try:
+        print("[PREVIEW] Getting preview stats...")
+        data = request.json
+        matches = data.get('matches', [])[:10]  # Only first 10 matches
+
+        if not matches:
+            return jsonify({'error': 'No matches found'}), 400
+
+        # Calculate quick stats
+        wins = sum(1 for m in matches if m.get('win'))
+        total_kills = sum(m.get('kills', 0) for m in matches)
+        total_deaths = sum(m.get('deaths', 0) for m in matches)
+        total_assists = sum(m.get('assists', 0) for m in matches)
+
+        # Most played champion in preview
+        from collections import Counter
+        champ_counts = Counter(m.get('championName') for m in matches)
+        most_played = champ_counts.most_common(1)[0] if champ_counts else ('Unknown', 0)
+
+        preview = {
+            'matches_analyzed': len(matches),
+            'wins': wins,
+            'losses': len(matches) - wins,
+            'winrate': round((wins / len(matches)) * 100, 1) if matches else 0,
+            'avg_kills': round(total_kills / len(matches), 1) if matches else 0,
+            'avg_deaths': round(total_deaths / len(matches), 1) if matches else 0,
+            'avg_assists': round(total_assists / len(matches), 1) if matches else 0,
+            'kda': round((total_kills + total_assists) / max(total_deaths, 1), 2),
+            'most_played_champion': most_played[0],
+            'most_played_games': most_played[1]
+        }
+
+        print(f"[PREVIEW] Preview stats: {preview}")
+        return jsonify(preview)
+
+    except Exception as e:
+        print(f"[PREVIEW] Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/year-in-review', methods=['POST'])
 def generate_year_in_review():
     """Generate comprehensive year-in-review analysis with AI insights"""
@@ -411,6 +526,59 @@ def generate_year_in_review():
         print(f"[YEAR-IN-REVIEW] Traceback:")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    """Submit user feedback via AWS SES"""
+    try:
+        data = request.json
+        email = data.get('email', 'anonymous')
+        feedback = data.get('feedback', '')
+
+        if not feedback:
+            return jsonify({'error': 'Feedback text is required'}), 400
+
+        print(f"[FEEDBACK] Received feedback from: {email}")
+
+        # Send email via AWS SES
+        ses_client = boto3.client('ses', region_name='us-east-1')
+
+        subject = f"Riftwind Feedback from {email}"
+        body = f"""
+New feedback received from Riftwind:
+
+Email: {email}
+Timestamp: {datetime.now().isoformat()}
+
+Feedback:
+{feedback}
+        """
+
+        response = ses_client.send_email(
+            Source='m@sveder.com',
+            Destination={
+                'ToAddresses': ['m@sveder.com']
+            },
+            Message={
+                'Subject': {
+                    'Data': subject,
+                    'Charset': 'UTF-8'
+                },
+                'Body': {
+                    'Text': {
+                        'Data': body,
+                        'Charset': 'UTF-8'
+                    }
+                }
+            }
+        )
+
+        print(f"[FEEDBACK] Email sent successfully: {response['MessageId']}")
+        return jsonify({'success': True, 'message': 'Feedback sent successfully'})
+
+    except Exception as e:
+        print(f"[FEEDBACK] Error sending feedback: {str(e)}")
+        return jsonify({'error': 'Failed to send feedback'}), 500
 
 @app.route('/api/roast-me', methods=['POST'])
 def roast_player():

@@ -1,6 +1,30 @@
 let reviewData = null;
 let currentCard = 0;
 
+// Configure marked library for inline rendering
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        breaks: true,
+        gfm: true
+    });
+}
+
+// Markdown to HTML converter using marked library
+function formatMarkdown(text) {
+    if (!text) return text;
+
+    // Use marked library if available, otherwise fallback to simple replacement
+    if (typeof marked !== 'undefined') {
+        return marked.parse(text);
+    }
+
+    // Fallback: basic markdown support
+    return text
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+}
+
 // Create animated background particles
 function createParticles() {
     const particles = document.getElementById('particles');
@@ -37,10 +61,81 @@ function startReview() {
     document.getElementById('introSection').style.display = 'none';
     document.getElementById('loadingOverlay').style.display = 'flex';
 
-    console.log('[YEAR IN REVIEW] Calling API to generate year-in-review...');
+    console.log('[YEAR IN REVIEW] First, getting preview stats...');
+
+    // First, show preview stats
+    showPreviewStats(data);
+}
+
+// Show preview stats before full analysis
+function showPreviewStats(summonerData) {
+    console.log('[PREVIEW] Getting preview stats...');
+
+    $.ajax({
+        url: '/api/preview-stats',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            matches: summonerData.recentMatches
+        }),
+        success: function(previewData) {
+            console.log('[PREVIEW] Preview data received:', previewData);
+
+            // Update loading screen with preview
+            document.getElementById('loadingOverlay').innerHTML = `
+                <div style="text-align: center; max-width: 600px;">
+                    <h2 style="color: #C79B3B; font-size: 2.5rem; margin-bottom: 30px;">Quick Preview</h2>
+                    <div style="background: rgba(30, 35, 40, 0.8); border: 2px solid #C79B3B; border-radius: 15px; padding: 30px; margin-bottom: 30px;">
+                        <p style="font-size: 1.3rem; margin-bottom: 20px;">Based on your first ${previewData.matches_analyzed} matches in 2025:</p>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0;">
+                            <div>
+                                <div style="font-size: 0.9rem; color: #A09B8C;">Win Rate</div>
+                                <div style="font-size: 2rem; color: #3BC77B; font-weight: bold;">${previewData.winrate}%</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #A09B8C;">KDA</div>
+                                <div style="font-size: 2rem; color: #C79B3B; font-weight: bold;">${previewData.kda}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #A09B8C;">Avg K/D/A</div>
+                                <div style="font-size: 1.5rem; color: #E4E1D8;">${previewData.avg_kills}/${previewData.avg_deaths}/${previewData.avg_assists}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.9rem; color: #A09B8C;">Most Played</div>
+                                <div style="font-size: 1.2rem; color: #E4E1D8;">${previewData.most_played_champion}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="continueToFullAnalysis()" style="background: linear-gradient(135deg, #C79B3B 0%, #D4AF37 100%); border: none; color: #0A1428; font-size: 1.3rem; font-weight: bold; padding: 15px 40px; border-radius: 50px; cursor: pointer; transition: transform 0.3s;">
+                        Continue to Full Analysis →
+                    </button>
+                    <p style="margin-top: 20px; color: #A09B8C; font-size: 0.9rem;">This will analyze all ${summonerData.recentMatches.length} matches</p>
+                </div>
+            `;
+
+            // Store summoner data for later
+            window.currentSummonerData = summonerData;
+        },
+        error: function(xhr) {
+            console.error('[PREVIEW] Error getting preview:', xhr);
+            // Fall back to direct full analysis
+            generateYearInReview(summonerData);
+        }
+    });
+}
+
+// Continue to full analysis after preview
+function continueToFullAnalysis() {
+    console.log('[YEAR IN REVIEW] Continuing to full analysis...');
+
+    document.getElementById('loadingOverlay').innerHTML = `
+        <div class="spinner"></div>
+        <p style="margin-top: 20px;">Analyzing your 2025 League journey...</p>
+        <p style="font-size: 0.9rem; color: #A09B8C; margin-top: 10px;">This may take a moment...</p>
+    `;
 
     // Generate year in review
-    generateYearInReview(data);
+    generateYearInReview(window.currentSummonerData);
 }
 
 // Generate year in review from API
@@ -109,7 +204,7 @@ function buildStoryCards(summonerData, reviewData) {
             <h2>Welcome Back, ${summonerData.summoner.name.split('#')[0]}!</h2>
             <div class="stat-number">${reviewData.total_matches}</div>
             <p>Games Played in Your League Journey</p>
-            <p style="margin-top: 30px; color: #A09B8C;">${reviewData.narrative}</p>
+            <p style="margin-top: 30px; color: #A09B8C;">${formatMarkdown(reviewData.narrative)}</p>
         </div>
     `);
 
@@ -135,6 +230,37 @@ function buildStoryCards(summonerData, reviewData) {
             </div>
         </div>
     `);
+
+    // Card 2.5: Total Hours Played
+    if (analysis.total_hours) {
+        const hours = analysis.total_hours.total_hours;
+        const avgGameMinutes = analysis.total_hours.average_game_minutes;
+        const longestGame = analysis.total_hours.longest_game_minutes;
+        const shortestGame = analysis.total_hours.shortest_game_minutes;
+
+        cards.push(`
+            <div class="story-card">
+                <h2>⏱️ Time in the Rift ⏱️</h2>
+                <div class="stat-number">${hours}</div>
+                <p style="font-size: 1.5rem; margin-bottom: 30px;">Hours Played</p>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="label">Avg Game Length</div>
+                        <div class="value">${avgGameMinutes} min</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Longest Game</div>
+                        <div class="value">${longestGame} min</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Shortest Game</div>
+                        <div class="value">${shortestGame} min</div>
+                    </div>
+                </div>
+                <p style="margin-top: 30px; color: #A09B8C;">That's ${Math.round(hours / 24)} days worth of League!</p>
+            </div>
+        `);
+    }
 
     // Card 3: Nemesis
     if (analysis.nemesis) {

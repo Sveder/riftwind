@@ -213,3 +213,60 @@ $(document).ready(function() {
         $('.result-section').show();
     }
 });
+
+// Quick fill function for famous streamers
+function quickFill(gameName, tagLine, region) {
+    $('#gameName').val(gameName);
+    $('#tagLine').val(tagLine);
+    $('#region').val(region);
+    $('#summonerForm').submit();
+}
+
+// Feedback form submission
+$(document).ready(function() {
+    $('#feedbackForm').on('submit', function(e) {
+        e.preventDefault();
+
+        const email = $('#feedbackEmail').val().trim();
+        const feedback = $('#feedbackText').val().trim();
+
+        if (!feedback) {
+            return;
+        }
+
+        // Hide previous messages
+        $('#feedbackSuccess').hide();
+        $('#feedbackError').hide();
+
+        // Disable submit button
+        const submitBtn = $(this).find('button[type="submit"]');
+        submitBtn.prop('disabled', true).text('Sending...');
+
+        // Send feedback to API
+        $.ajax({
+            url: '/api/feedback',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                email: email || 'anonymous',
+                feedback: feedback
+            }),
+            success: function(response) {
+                $('#feedbackSuccess').show();
+                $('#feedbackText').val('');
+                $('#feedbackEmail').val('');
+                submitBtn.prop('disabled', false).text('Send Feedback');
+
+                // Close modal after 2 seconds
+                setTimeout(function() {
+                    $('#feedbackModal').modal('hide');
+                    $('#feedbackSuccess').hide();
+                }, 2000);
+            },
+            error: function(xhr) {
+                $('#feedbackError').show();
+                submitBtn.prop('disabled', false).text('Send Feedback');
+            }
+        });
+    });
+});

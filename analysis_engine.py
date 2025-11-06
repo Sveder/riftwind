@@ -69,6 +69,9 @@ class YearInReviewAnalyzer:
         print("[ANALYZER] Calculating champion diversity...")
         diversity = self.calculate_champion_diversity()
 
+        print("[ANALYZER] Calculating total hours played...")
+        total_hours = self.calculate_total_hours()
+
         print("[ANALYZER] ✅ All analysis complete!")
 
         return {
@@ -86,7 +89,8 @@ class YearInReviewAnalyzer:
             'surrender_analysis': surrenders,
             'what_if_scenarios': what_if,
             'time_analysis': time_analysis,
-            'champion_diversity': diversity
+            'champion_diversity': diversity,
+            'total_hours': total_hours
         }
 
     def find_nemesis(self):
@@ -533,6 +537,28 @@ class YearInReviewAnalyzer:
             'top_3_champions': [{'name': champ, 'games': count} for champ, count in top_3],
             'top_3_percentage': round(top_3_percentage, 1),
             'one_trick': top_3_percentage > 70  # True if player is a one-trick (70%+ on top 3)
+        }
+
+    def calculate_total_hours(self):
+        """Calculate total hours played across all matches"""
+        total_seconds = sum(match.get('gameDuration', 0) for match in self.matches)
+        total_hours = total_seconds / 3600  # Convert seconds to hours
+
+        # Calculate average game duration in minutes
+        avg_seconds = total_seconds / len(self.matches) if self.matches else 0
+        avg_minutes = avg_seconds / 60
+
+        # Find longest and shortest games
+        longest_game = max((m.get('gameDuration', 0) for m in self.matches), default=0)
+        shortest_game = min((m.get('gameDuration', 9999) for m in self.matches), default=0)
+
+        return {
+            'total_hours': round(total_hours, 1),
+            'total_minutes': round(total_seconds / 60, 0),
+            'total_seconds': total_seconds,
+            'average_game_minutes': round(avg_minutes, 1),
+            'longest_game_minutes': round(longest_game / 60, 1),
+            'shortest_game_minutes': round(shortest_game / 60, 1)
         }
 
     def generate_ai_narrative(self, analysis_data):
