@@ -19,6 +19,13 @@ $(document).ready(function() {
             return;
         }
 
+        // Disable submit button to prevent double submission
+        const submitBtn = $('#summonerForm button[type="submit"]');
+        submitBtn.prop('disabled', true).css({
+            'opacity': '0.5',
+            'cursor': 'not-allowed'
+        });
+
         // Show loading, hide results
         $('.loading').show();
         $('.result-section').hide();
@@ -41,6 +48,13 @@ $(document).ready(function() {
                 const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'An error occurred';
                 showError(errorMsg);
                 $('.loading').hide();
+
+                // Re-enable submit button on error
+                const submitBtn = $('#summonerForm button[type="submit"]');
+                submitBtn.prop('disabled', false).css({
+                    'opacity': '1',
+                    'cursor': 'pointer'
+                });
             }
         });
     });
