@@ -733,8 +733,9 @@ Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some
         if not self.matches:
             return None
 
-        # Group matches by month
+        # Group matches by month and track roles
         monthly_cs = defaultdict(lambda: {'total_cs': 0, 'total_minutes': 0, 'games': 0})
+        role_counts = Counter()
 
         # Rank benchmarks for CS/min (approximate averages by rank)
         cs_benchmarks = {
@@ -754,6 +755,10 @@ Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some
             timestamp = match.get('gameCreation', 0) / 1000
             date = datetime.fromtimestamp(timestamp)
             month_key = date.strftime('%Y-%m')
+
+            # Track role
+            role = match.get('individualPosition', 'NONE')
+            role_counts[role] += 1
 
             total_cs = match.get('totalMinionsKilled', 0) + match.get('neutralMinionsKilled', 0)
             game_duration_minutes = match.get('gameDuration', 0) / 60
@@ -785,6 +790,11 @@ Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some
         # Calculate overall average
         overall_cs_per_min = total_cs_all / total_minutes_all if total_minutes_all > 0 else 0
 
+        # Check if mostly jungler (>50% jungle games)
+        total_games = sum(role_counts.values())
+        jungle_games = role_counts.get('JUNGLE', 0)
+        is_jungler = jungle_games > (total_games * 0.5)
+
         # Determine estimated rank based on CS/min
         estimated_rank = 'Iron'
         for rank, benchmark in sorted(cs_benchmarks.items(), key=lambda x: x[1]):
@@ -796,5 +806,7 @@ Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some
             'overall_cs_per_min': round(overall_cs_per_min, 1),
             'total_cs': total_cs_all,
             'estimated_rank': estimated_rank,
-            'benchmarks': cs_benchmarks
+            'benchmarks': cs_benchmarks,
+            'is_jungler': is_jungler,
+            'jungle_percentage': round((jungle_games / total_games * 100) if total_games > 0 else 0, 1)
         }
