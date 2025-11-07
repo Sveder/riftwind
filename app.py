@@ -220,10 +220,10 @@ Timestamp: {search_time}
         start_2025 = int(datetime(2025, 1, 1).timestamp())
         end_2025 = int(datetime(2025, 12, 31, 23, 59, 59).timestamp())
 
-        # Fetch matches in batches (max 100 per request, fetch up to 1000 total)
+        # Fetch matches in batches (max 100 per request, fetch up to 100 total)
         match_ids = []
         matches_per_batch = 100
-        max_matches = 1000
+        max_matches = 100
 
         for start_index in range(0, max_matches, matches_per_batch):
             match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?startTime={start_2025}&endTime={end_2025}&start={start_index}&count={matches_per_batch}'
