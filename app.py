@@ -153,7 +153,7 @@ IP Address: {user_ip}
 Timestamp: {search_time}
 """
             ses_client.send_email(
-                Source='m@sveder.com',
+                Source='Riftwind <m@sveder.com>',
                 Destination={'ToAddresses': ['m@sveder.com']},
                 Message={
                     'Subject': {'Data': f'Riftwind Search: {game_name}#{tag_line}'},
@@ -627,7 +627,7 @@ Feedback:
         """
 
         response = ses_client.send_email(
-            Source='m@sveder.com',
+            Source='Riftwind <m@sveder.com>',
             Destination={
                 'ToAddresses': ['m@sveder.com']
             },
