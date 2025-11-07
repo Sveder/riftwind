@@ -150,7 +150,8 @@ function generateYearInReview(summonerData) {
         data: JSON.stringify({
             matches: summonerData.recentMatches,
             summonerName: summonerData.summoner.name,
-            region: summonerData.region
+            region: summonerData.region,
+            timelines: summonerData.matchTimelines || []
         }),
         success: function(data) {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);

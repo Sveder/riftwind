@@ -493,6 +493,8 @@ Timestamp: {search_time}
             'totalGames': total_games,
             'topChampions': mastery_data[:5] if mastery_data else [],
             'recentMatches': processed_matches,
+            'matchTimelines': match_timelines,
+            'region': region,
             'firstMatchTimeline': {
                 'hasTimeline': first_match_timeline is not None,
                 'deathPositions': death_positions,
@@ -555,9 +557,11 @@ def generate_year_in_review():
         matches = data.get('matches', [])
         summoner_name = data.get('summonerName', 'Summoner')
         region = data.get('region', 'na1')
+        timelines = data.get('timelines', [])
 
         print(f"[YEAR-IN-REVIEW] Received request for: {summoner_name}")
         print(f"[YEAR-IN-REVIEW] Matches count: {len(matches)}")
+        print(f"[YEAR-IN-REVIEW] Timelines count: {len(timelines)}")
 
         if not matches or len(matches) < 5:
             print(f"[YEAR-IN-REVIEW] ERROR: Not enough matches ({len(matches)})")
@@ -566,8 +570,7 @@ def generate_year_in_review():
         print(f"[YEAR-IN-REVIEW] Creating analyzer...")
 
         # Create analyzer and run all analysis
-        # Note: timelines not available in this endpoint (would require additional API calls)
-        analyzer = YearInReviewAnalyzer(matches, summoner_name, region, timelines=[])
+        analyzer = YearInReviewAnalyzer(matches, summoner_name, region, timelines=timelines)
 
         print(f"[YEAR-IN-REVIEW] Running analysis...")
         analysis = analyzer.analyze_all()
