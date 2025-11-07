@@ -210,9 +210,9 @@ function buildStoryCards(summonerData, reviewData) {
     const cards = [];
     console.log('[BUILD CARDS] Analysis data available:', Object.keys(analysis));
 
-    // Card 1: Welcome & Total Games
+    // Card 1: Welcome & Total Games - Full Width
     cards.push(`
-        <div class="story-card">
+        <div class="story-card" id="welcomeCard">
             <h2>Welcome Back, ${summonerData.summoner.name.split('#')[0]}!</h2>
             <div class="stat-number">${reviewData.total_matches}</div>
             <p>Games Played in Your League Journey</p>
