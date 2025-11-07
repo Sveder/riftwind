@@ -123,6 +123,11 @@ REGION_ROUTING = {
 def index():
     return render_template('index.html')
 
+@app.route('/riot.txt')
+def riot_verification():
+    """Riot Games API verification file"""
+    return 'a8d304cf-a066-4ad8-a6c2-07ecfc317ce3', 200, {'Content-Type': 'text/plain'}
+
 @app.route('/year-in-review')
 def year_in_review():
     return render_template('year_in_review.html')
