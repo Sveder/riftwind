@@ -707,7 +707,7 @@ Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some
                 modelId=MODEL_ID,
                 body=json.dumps({
                     "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 300,
+                    "max_tokens": 1000,
                     "messages": [
                         {
                             "role": "user",
