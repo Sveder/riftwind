@@ -107,21 +107,40 @@
             box-shadow: 0 15px 40px rgba(199, 155, 59, 0.5);
         }
 
+        /* Story Cards Container */
+        #storyCards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin: 50px 0;
+        }
+
+        @media (max-width: 1200px) {
+            #storyCards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            #storyCards {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Story Cards */
         .story-card {
             background: linear-gradient(135deg, #1E2328 0%, #0A1428 100%);
             border: 3px solid #C79B3B;
-            border-radius: 30px;
-            padding: 60px 40px;
-            margin: 100px 0;
-            min-height: 600px;
+            border-radius: 20px;
+            padding: 30px 20px;
+            min-height: 350px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 20px 60px rgba(199, 155, 59, 0.3);
+            box-shadow: 0 10px 30px rgba(199, 155, 59, 0.3);
             opacity: 0;
-            transform: translateY(50px);
+            transform: translateY(30px);
             transition: all 0.8s ease;
         }
 
@@ -131,14 +150,14 @@
         }
 
         .story-card h2 {
-            font-size: 3rem;
+            font-size: 2rem;
             color: #C79B3B;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             text-align: center;
         }
 
         .story-card .stat-number {
-            font-size: 6rem;
+            font-size: 4rem;
             font-weight: 700;
             background: linear-gradient(135deg, #C79B3B 0%, #FFD700 100%);
             -webkit-background-clip: text;
@@ -148,11 +167,22 @@
         }
 
         .story-card p {
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             color: #E4E1D8;
             text-align: center;
             line-height: 1.6;
-            max-width: 800px;
+            max-width: 100%;
+        }
+
+        /* Full-width sections (roast and share) */
+        #roastSection, #shareSection {
+            grid-column: 1 / -1;
+            min-height: 400px;
+            padding: 40px;
+        }
+
+        #roastSection h2, #shareSection h2 {
+            font-size: 2.5rem;
         }
 
         /* Progress Bar */
@@ -340,13 +370,60 @@
         </div>
 
         <!-- Story Cards (Generated Dynamically) -->
-        <div id="storyCards"></div>
+        <div id="storyCards">
+            <!-- Roast Section -->
+            <div class="story-card" id="roastSection" style="display: none;">
+                <h2>Ready for a Reality Check? 😈</h2>
+                <button class="roast-button" onclick="getRoasted()">Roast Me</button>
+                <div class="roast-text" id="roastText"></div>
+            </div>
 
-        <!-- Roast Section -->
-        <div class="story-card" id="roastSection" style="display: none;">
-            <h2>Ready for a Reality Check? 😈</h2>
-            <button class="roast-button" onclick="getRoasted()">Roast Me</button>
-            <div class="roast-text" id="roastText"></div>
+            <!-- Share Section -->
+            <div class="story-card" id="shareSection" style="display: none;">
+                <h2>Share Your Year in Review!</h2>
+                <p style="margin-bottom: 30px;">Show off your League of Legends journey with your friends</p>
+                <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                    <button onclick="shareToTwitter()" style="
+                        background: #1DA1F2;
+                        border: none;
+                        color: white;
+                        font-size: 1.1rem;
+                        font-weight: bold;
+                        padding: 15px 30px;
+                        border-radius: 25px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        🐦 Share on Twitter
+                    </button>
+                    <button onclick="shareToFacebook()" style="
+                        background: #1877F2;
+                        border: none;
+                        color: white;
+                        font-size: 1.1rem;
+                        font-weight: bold;
+                        padding: 15px 30px;
+                        border-radius: 25px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        📘 Share on Facebook
+                    </button>
+                    <button onclick="shareToBluesky()" style="
+                        background: #0085FF;
+                        border: none;
+                        color: white;
+                        font-size: 1.1rem;
+                        font-weight: bold;
+                        padding: 15px 30px;
+                        border-radius: 25px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        🦋 Share on Bluesky
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

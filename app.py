@@ -237,6 +237,16 @@ Timestamp: {search_time}
 
                 if match_response.status_code == 200:
                     match_ids_batch = match_response.json()
+                elif match_response.status_code == 429:
+                    print(f"[MATCH API] Rate limited (429), sleeping for 2 seconds...")
+                    time.sleep(2)
+                    # Retry once after rate limit
+                    match_response = requests.get(match_url, headers=headers)
+                    if match_response.status_code == 200:
+                        match_ids_batch = match_response.json()
+                    else:
+                        print(f"[MATCH API] Still failing after retry, using data collected so far")
+                        break
                 else:
                     print(f"[MATCH API] Failed with status {match_response.status_code}")
                     break
@@ -271,6 +281,17 @@ Timestamp: {search_time}
                 if detail_response.status_code == 200:
                     match_data = detail_response.json()
                     print(f"[MATCH DETAILS] Successfully fetched match {match_id}")
+                elif detail_response.status_code == 429:
+                    print(f"[MATCH DETAILS] Rate limited (429) on match {match_id}, sleeping for 1 second...")
+                    time.sleep(1)
+                    # Retry once after rate limit
+                    detail_response = requests.get(match_detail_url, headers=headers)
+                    if detail_response.status_code == 200:
+                        match_data = detail_response.json()
+                        print(f"[MATCH DETAILS] Successfully fetched match {match_id} after retry")
+                    else:
+                        print(f"[MATCH DETAILS] Still rate limited, skipping match {match_id}")
+                        continue
                 else:
                     print(f"[MATCH DETAILS] Failed to fetch match {match_id}: {detail_response.status_code}")
                     continue

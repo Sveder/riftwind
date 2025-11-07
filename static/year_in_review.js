@@ -172,6 +172,9 @@ function generateYearInReview(summonerData) {
             // Show roast section
             document.getElementById('roastSection').style.display = 'flex';
 
+            // Show share section
+            document.getElementById('shareSection').style.display = 'flex';
+
             // Initialize scroll animations
             console.log('[YEAR IN REVIEW] Initializing scroll animations...');
             initScrollAnimations();
@@ -732,6 +735,31 @@ function getRoasted() {
             document.getElementById('roastText').innerHTML = 'Even the AI could not come up with a roast for you... 🤷';
         }
     });
+}
+
+// Social sharing functions
+function shareToTwitter() {
+    const summonerData = JSON.parse(localStorage.getItem('summonerData'));
+    const summonerName = summonerData?.summoner?.name || 'My';
+    const text = `Check out ${summonerName} League of Legends 2025 Year in Review! 🎮✨`;
+    const url = window.location.href;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+    window.open(twitterUrl, '_blank', 'width=600,height=400');
+}
+
+function shareToFacebook() {
+    const url = window.location.href;
+    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    window.open(facebookUrl, '_blank', 'width=600,height=400');
+}
+
+function shareToBluesky() {
+    const summonerData = JSON.parse(localStorage.getItem('summonerData'));
+    const summonerName = summonerData?.summoner?.name || 'My';
+    const text = `Check out ${summonerName} League of Legends 2025 Year in Review! 🎮✨`;
+    const url = window.location.href;
+    const blueskyUrl = `https://bsky.app/intent/compose?text=${encodeURIComponent(text + '\n' + url)}`;
+    window.open(blueskyUrl, '_blank', 'width=600,height=400');
 }
 
 // Initialize on page load
