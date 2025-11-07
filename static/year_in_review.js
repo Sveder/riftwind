@@ -212,19 +212,11 @@ function buildStoryCards(summonerData, reviewData) {
 
     // Card 1: Welcome & Total Games
     cards.push(`
-        <div class="story-card" onclick="this.classList.toggle('flipped')">
-            <div class="card-inner">
-                <div class="card-front">
-                    <h2>Welcome Back!</h2>
-                    <div class="stat-number">${reviewData.total_matches}</div>
-                    <p>Games Played</p>
-                    <p class="click-hint">Click to see more ✨</p>
-                </div>
-                <div class="card-back">
-                    <h2>${summonerData.summoner.name.split('#')[0]}'s Journey</h2>
-                    <p style="margin-top: 20px; color: #E4E1D8; font-size: 1rem;">${formatMarkdown(reviewData.narrative)}</p>
-                </div>
-            </div>
+        <div class="story-card">
+            <h2>Welcome Back, ${summonerData.summoner.name.split('#')[0]}!</h2>
+            <div class="stat-number">${reviewData.total_matches}</div>
+            <p>Games Played in Your League Journey</p>
+            <p style="margin-top: 30px; color: #A09B8C;">${formatMarkdown(reviewData.narrative)}</p>
         </div>
     `);
 
@@ -232,30 +224,20 @@ function buildStoryCards(summonerData, reviewData) {
     const wins = summonerData.recentMatches.filter(m => m.win).length;
     const winRate = ((wins / reviewData.total_matches) * 100).toFixed(1);
     cards.push(`
-        <div class="story-card" onclick="this.classList.toggle('flipped')">
-            <div class="card-inner">
-                <div class="card-front">
-                    <h2>Battle Record</h2>
-                    <div class="stat-number">${winRate}%</div>
-                    <p>Win Rate</p>
-                    <p class="click-hint">Click to see details ✨</p>
+        <div class="story-card">
+            <h2>Your Battle Record</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="label">Win Rate</div>
+                    <div class="value">${winRate}%</div>
                 </div>
-                <div class="card-back">
-                    <h2>Your Performance</h2>
-                    <div class="stats-grid">
-                        <div class="stat-box">
-                            <div class="label">Win Rate</div>
-                            <div class="value">${winRate}%</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="label">Victories</div>
-                            <div class="value">${wins}</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="label">Defeats</div>
-                            <div class="value">${reviewData.total_matches - wins}</div>
-                        </div>
-                    </div>
+                <div class="stat-box">
+                    <div class="label">Victories</div>
+                    <div class="value">${wins}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">Defeats</div>
+                    <div class="value">${reviewData.total_matches - wins}</div>
                 </div>
             </div>
         </div>
@@ -269,33 +251,25 @@ function buildStoryCards(summonerData, reviewData) {
         const shortestGame = analysis.total_hours.shortest_game_minutes;
 
         cards.push(`
-            <div class="story-card" onclick="this.classList.toggle('flipped')">
-                <div class="card-inner">
-                    <div class="card-front">
-                        <h2>⏱️ Time in the Rift</h2>
-                        <div class="stat-number">${hours}</div>
-                        <p>Hours Played</p>
-                        <p class="click-hint">Click to see breakdown ✨</p>
+            <div class="story-card">
+                <h2>⏱️ Time in the Rift ⏱️</h2>
+                <div class="stat-number">${hours}</div>
+                <p style="font-size: 1.5rem; margin-bottom: 30px;">Hours Played</p>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="label">Avg Game Length</div>
+                        <div class="value">${avgGameMinutes} min</div>
                     </div>
-                    <div class="card-back">
-                        <h2>Game Time Stats</h2>
-                        <div class="stats-grid">
-                            <div class="stat-box">
-                                <div class="label">Avg Game</div>
-                                <div class="value">${avgGameMinutes} min</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="label">Longest</div>
-                                <div class="value">${longestGame} min</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="label">Shortest</div>
-                                <div class="value">${shortestGame} min</div>
-                            </div>
-                        </div>
-                        <p style="margin-top: 20px; color: #A09B8C;">That's ${Math.round(hours / 24)} days of League!</p>
+                    <div class="stat-box">
+                        <div class="label">Longest Game</div>
+                        <div class="value">${longestGame} min</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Shortest Game</div>
+                        <div class="value">${shortestGame} min</div>
                     </div>
                 </div>
+                <p style="margin-top: 30px; color: #A09B8C;">That's ${Math.round(hours / 24)} days worth of League!</p>
             </div>
         `);
     }
@@ -303,23 +277,14 @@ function buildStoryCards(summonerData, reviewData) {
     // Card 3: Nemesis
     if (analysis.nemesis) {
         cards.push(`
-            <div class="story-card" onclick="this.classList.toggle('flipped')">
-                <div class="card-inner">
-                    <div class="card-front">
-                        <h2>Your Nemesis 😈</h2>
-                        <div class="stat-number">${analysis.nemesis.losses}</div>
-                        <p>Losses</p>
-                        <p class="click-hint">Click to reveal ✨</p>
-                    </div>
-                    <div class="card-back">
-                        <div class="nemesis-card">
-                            <h3 style="color: #C73B3B; font-size: 2rem;">${analysis.nemesis.name}</h3>
-                            <p style="font-size: 1.5rem; margin: 15px 0;">
-                                Lost <span style="color: #C73B3B; font-weight: bold;">${analysis.nemesis.losses}</span> times
-                            </p>
-                            <p style="color: #A09B8C; font-size: 0.95rem;">Time for revenge in 2025!</p>
-                        </div>
-                    </div>
+            <div class="story-card">
+                <h2>Your Nemesis 😈</h2>
+                <div class="nemesis-card">
+                    <h3 style="color: #C73B3B; font-size: 2.5rem;">${analysis.nemesis.name}</h3>
+                    <p style="font-size: 1.8rem; margin: 20px 0;">
+                        Lost <span style="color: #C73B3B; font-weight: bold;">${analysis.nemesis.losses}</span> times against them
+                    </p>
+                    <p style="color: #A09B8C;">This player has your number. Time for revenge in 2025!</p>
                 </div>
             </div>
         `);
@@ -328,26 +293,17 @@ function buildStoryCards(summonerData, reviewData) {
     // Card 4: BFF/Duo Partner
     if (analysis.bff) {
         cards.push(`
-            <div class="story-card" onclick="this.classList.toggle('flipped')">
-                <div class="card-inner">
-                    <div class="card-front">
-                        <h2>Dynamic Duo 🤝</h2>
-                        <div class="stat-number">${analysis.bff.games}</div>
-                        <p>Games Together</p>
-                        <p class="click-hint">Click to see partner ✨</p>
-                    </div>
-                    <div class="card-back">
-                        <div class="bff-card">
-                            <h3 style="color: #3BC77B; font-size: 2rem;">${analysis.bff.name}</h3>
-                            <p style="font-size: 1.5rem; margin: 15px 0;">
-                                <span style="color: #3BC77B; font-weight: bold;">${analysis.bff.games}</span> games together
-                            </p>
-                            <p style="font-size: 1.3rem; margin: 10px 0;">
-                                ${analysis.bff.winrate}% Win Rate
-                            </p>
-                            <p style="color: #A09B8C; font-size: 0.95rem;">Your most reliable teammate!</p>
-                        </div>
-                    </div>
+            <div class="story-card">
+                <h2>Your Dynamic Duo 🤝</h2>
+                <div class="bff-card">
+                    <h3 style="color: #3BC77B; font-size: 2.5rem;">${analysis.bff.name}</h3>
+                    <p style="font-size: 1.8rem; margin: 20px 0;">
+                        <span style="color: #3BC77B; font-weight: bold;">${analysis.bff.games}</span> games together
+                    </p>
+                    <p style="font-size: 1.5rem; margin: 10px 0;">
+                        ${analysis.bff.winrate}% Win Rate
+                    </p>
+                    <p style="color: #A09B8C;">Your most reliable teammate!</p>
                 </div>
             </div>
         `);

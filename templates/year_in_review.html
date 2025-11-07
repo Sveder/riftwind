@@ -129,68 +129,24 @@
 
         /* Story Cards */
         .story-card {
+            background: linear-gradient(135deg, #1E2328 0%, #0A1428 100%);
             border: 3px solid #C79B3B;
             border-radius: 20px;
-            padding: 0;
+            padding: 30px 20px;
             min-height: 350px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             box-shadow: 0 10px 30px rgba(199, 155, 59, 0.3);
             opacity: 0;
             transform: translateY(30px);
             transition: all 0.8s ease;
-            cursor: pointer;
-            position: relative;
-            perspective: 1000px;
-            background: transparent;
         }
 
         .story-card.visible {
             opacity: 1;
             transform: translateY(0);
-        }
-
-        .story-card.visible:hover {
-            box-shadow: 0 15px 40px rgba(199, 155, 59, 0.5);
-        }
-
-        /* Card flip functionality */
-        .card-inner {
-            position: relative;
-            width: 100%;
-            min-height: 350px;
-            transition: transform 0.6s;
-            transform-style: preserve-3d;
-        }
-
-        .story-card.flipped .card-inner {
-            transform: rotateY(180deg);
-        }
-
-        .card-front, .card-back {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            min-height: 350px;
-            padding: 30px 20px;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            border-radius: 17px;
-            background: linear-gradient(135deg, #1E2328 0%, #0A1428 100%);
-        }
-
-        .card-back {
-            transform: rotateY(180deg);
-        }
-
-        .click-hint {
-            font-size: 0.9rem;
-            color: #A09B8C;
-            margin-top: 20px;
-            opacity: 0.7;
         }
 
         .story-card h2 {
