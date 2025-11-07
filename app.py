@@ -301,31 +301,30 @@ Timestamp: {search_time}
 
         print(f"[MATCH DETAILS] Total matches fetched: {len(match_details)}")
 
-        # Step 6: Get timeline for the first (most recent) match
-        first_match_timeline = None
-        if match_ids:
-            first_match_id = match_ids[0]
-            timeline_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{first_match_id}/timeline'
-            print(f"[TIMELINE] Fetching timeline for first match: {first_match_id}")
-            print(f"[TIMELINE] URL: {timeline_url}")
+        # Step 6: Get timeline data for multiple matches (for kill steal analysis)
+        match_timelines = []
+        timeline_fetch_limit = min(15, len(match_ids))  # Fetch up to 15 timelines
 
-            timeline_response = requests.get(timeline_url, headers=headers, timeout=30)
-            print(f"[TIMELINE] Status Code: {timeline_response.status_code}")
+        print(f"[TIMELINE] Fetching timelines for {timeline_fetch_limit} matches...")
+        for i, match_id in enumerate(match_ids[:timeline_fetch_limit]):
+            timeline_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{match_id}/timeline'
 
-            if timeline_response.status_code == 200:
-                first_match_timeline = timeline_response.json()
-                print(f"[TIMELINE] Successfully fetched timeline")
+            # Try cache first
+            timeline_data = cached_request(timeline_url, headers)
 
-                # Count death positions in timeline
-                death_count = 0
-                if first_match_timeline and 'info' in first_match_timeline:
-                    for frame in first_match_timeline['info'].get('frames', []):
-                        for event in frame.get('events', []):
-                            if event.get('type') == 'CHAMPION_KILL' and 'position' in event:
-                                death_count += 1
-                print(f"[TIMELINE] Found {death_count} champion kills with position data")
+            if timeline_data:
+                match_timelines.append({
+                    'match_id': match_id,
+                    'timeline': timeline_data
+                })
+                print(f"[TIMELINE] Fetched timeline {i+1}/{timeline_fetch_limit}: {match_id}")
             else:
-                print(f"[TIMELINE] Failed to fetch timeline: {timeline_response.status_code}")
+                print(f"[TIMELINE] Failed to fetch timeline for {match_id}")
+
+        print(f"[TIMELINE] Successfully fetched {len(match_timelines)} timelines")
+
+        # Keep first_match_timeline for backward compatibility
+        first_match_timeline = match_timelines[0]['timeline'] if match_timelines else None
 
         # Get champion data
         champion_data = get_champion_name(mastery_data[0]['championId']) if mastery_data else None
@@ -337,7 +336,8 @@ Timestamp: {search_time}
             'mastery_data': mastery_data,
             'match_ids': match_ids,
             'match_details': match_details,
-            'first_match_timeline': first_match_timeline
+            'first_match_timeline': first_match_timeline,
+            'match_timelines': match_timelines
         })
 
         # Process match details to extract COMPREHENSIVE data for year-in-review
@@ -566,7 +566,7 @@ def generate_year_in_review():
         print(f"[YEAR-IN-REVIEW] Creating analyzer...")
 
         # Create analyzer and run all analysis
-        analyzer = YearInReviewAnalyzer(matches, summoner_name, region)
+        analyzer = YearInReviewAnalyzer(matches, summoner_name, region, match_timelines)
 
         print(f"[YEAR-IN-REVIEW] Running analysis...")
         analysis = analyzer.analyze_all()

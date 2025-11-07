@@ -723,6 +723,63 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
+    // Card 16: Kill Steals
+    if (analysis.kill_steals && analysis.kill_steals.total_kills > 0) {
+        const ks = analysis.kill_steals;
+
+        // Determine message based on kill steal rate
+        let ksMessage = "";
+        let ksEmoji = "";
+        if (ks.kill_steal_rate > 30) {
+            ksEmoji = "🥷";
+            ksMessage = "Professional Kill Stealer";
+        } else if (ks.kill_steal_rate > 15) {
+            ksEmoji = "😏";
+            ksMessage = "Opportunistic Finisher";
+        } else if (ks.kill_steal_rate > 5) {
+            ksEmoji = "🎯";
+            ksMessage = "Efficient Damage Dealer";
+        } else {
+            ksEmoji = "💪";
+            ksMessage = "True Carry";
+        }
+
+        cards.push(`
+            <div class="story-card">
+                <h2>${ksEmoji} Kill Participation</h2>
+                <div class="stat-number">${ks.average_damage_contribution}%</div>
+                <p style="font-size: 1.3rem; margin-bottom: 20px;">Average Damage on Kills</p>
+
+                <div style="margin-top: 20px; padding: 15px; background: rgba(199, 155, 59, 0.1); border-radius: 10px;">
+                    <p style="color: #C79B3B; font-size: 1.1rem; margin: 5px 0;">
+                        <strong>${ksMessage}</strong>
+                    </p>
+                    <p style="color: #A09B8C; font-size: 0.95rem; margin: 10px 0;">
+                        ${ks.kill_steals} kills with <15% damage (${ks.kill_steal_rate}%)
+                    </p>
+                </div>
+
+                ${ks.most_shameless_kill ? `
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(255, 100, 100, 0.1); border-radius: 8px; border-left: 3px solid #ff6464;">
+                        <p style="color: #ff6464; font-size: 0.9rem; margin: 0; font-weight: bold;">
+                            Most Shameless Kill Steal
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.85rem; margin: 5px 0 0 0;">
+                            ${ks.most_shameless_kill.damage_percentage}% damage contribution
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin: 3px 0 0 0; font-style: italic;">
+                            (${ks.most_shameless_kill.killer_damage} of ${ks.most_shameless_kill.team_damage} team damage)
+                        </p>
+                    </div>
+                ` : ''}
+
+                <p style="color: #A09B8C; margin-top: 15px; font-size: 0.9rem;">
+                    Analyzed ${ks.total_kills} kills across recent matches
+                </p>
+            </div>
+        `);
+    }
+
     // Add all cards to container (prepend before roast/share sections)
     console.log('[BUILD CARDS] Total cards built:', cards.length);
     console.log('[BUILD CARDS] Inserting cards into DOM...');
