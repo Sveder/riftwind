@@ -648,10 +648,25 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
-    // Add all cards to container
+    // Add all cards to container (prepend before roast/share sections)
     console.log('[BUILD CARDS] Total cards built:', cards.length);
     console.log('[BUILD CARDS] Inserting cards into DOM...');
+
+    // Get existing roast and share sections
+    const roastSection = document.getElementById('roastSection');
+    const shareSection = document.getElementById('shareSection');
+
+    // Clear container and add cards
     container.innerHTML = cards.join('');
+
+    // Re-append roast and share sections at the end
+    if (roastSection) {
+        container.appendChild(roastSection);
+    }
+    if (shareSection) {
+        container.appendChild(shareSection);
+    }
+
     console.log('[BUILD CARDS] ✅ All cards inserted into DOM!');
 }
 
