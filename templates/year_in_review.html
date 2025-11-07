@@ -129,7 +129,6 @@
 
         /* Story Cards */
         .story-card {
-            background: linear-gradient(135deg, #1E2328 0%, #0A1428 100%);
             border: 3px solid #C79B3B;
             border-radius: 20px;
             padding: 0;
@@ -141,6 +140,7 @@
             cursor: pointer;
             position: relative;
             perspective: 1000px;
+            background: transparent;
         }
 
         .story-card.visible {
@@ -178,7 +178,8 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            border-radius: 20px;
+            border-radius: 17px;
+            background: linear-gradient(135deg, #1E2328 0%, #0A1428 100%);
         }
 
         .card-back {
