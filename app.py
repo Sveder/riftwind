@@ -566,7 +566,8 @@ def generate_year_in_review():
         print(f"[YEAR-IN-REVIEW] Creating analyzer...")
 
         # Create analyzer and run all analysis
-        analyzer = YearInReviewAnalyzer(matches, summoner_name, region, match_timelines)
+        # Note: timelines not available in this endpoint (would require additional API calls)
+        analyzer = YearInReviewAnalyzer(matches, summoner_name, region, timelines=[])
 
         print(f"[YEAR-IN-REVIEW] Running analysis...")
         analysis = analyzer.analyze_all()
