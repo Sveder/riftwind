@@ -72,6 +72,9 @@ class YearInReviewAnalyzer:
         print("[ANALYZER] Calculating total hours played...")
         total_hours = self.calculate_total_hours()
 
+        print("[ANALYZER] Analyzing CS efficiency...")
+        cs_efficiency = self.analyze_cs_efficiency()
+
         print("[ANALYZER] ✅ All analysis complete!")
 
         return {
@@ -90,7 +93,8 @@ class YearInReviewAnalyzer:
             'what_if_scenarios': what_if,
             'time_analysis': time_analysis,
             'champion_diversity': diversity,
-            'total_hours': total_hours
+            'total_hours': total_hours,
+            'cs_efficiency': cs_efficiency
         }
 
     def find_nemesis(self):
@@ -723,3 +727,74 @@ Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some
             import traceback
             traceback.print_exc()
             return "Even the roast bot gave up on you... just like your teammates."
+
+    def analyze_cs_efficiency(self):
+        """Analyze CS (Creep Score) per minute by month"""
+        if not self.matches:
+            return None
+
+        # Group matches by month
+        monthly_cs = defaultdict(lambda: {'total_cs': 0, 'total_minutes': 0, 'games': 0})
+
+        # Rank benchmarks for CS/min (approximate averages by rank)
+        cs_benchmarks = {
+            'Iron': 3.5,
+            'Bronze': 4.0,
+            'Silver': 4.5,
+            'Gold': 5.0,
+            'Platinum': 5.5,
+            'Emerald': 6.0,
+            'Diamond': 6.5,
+            'Master': 7.0,
+            'Grandmaster': 7.5,
+            'Challenger': 8.0
+        }
+
+        for match in self.matches:
+            timestamp = match.get('gameCreation', 0) / 1000
+            date = datetime.fromtimestamp(timestamp)
+            month_key = date.strftime('%Y-%m')
+
+            total_cs = match.get('totalMinionsKilled', 0) + match.get('neutralMinionsKilled', 0)
+            game_duration_minutes = match.get('gameDuration', 0) / 60
+
+            if game_duration_minutes > 0:
+                monthly_cs[month_key]['total_cs'] += total_cs
+                monthly_cs[month_key]['total_minutes'] += game_duration_minutes
+                monthly_cs[month_key]['games'] += 1
+
+        # Calculate CS per minute for each month
+        monthly_data = []
+        total_cs_all = 0
+        total_minutes_all = 0
+
+        for month in sorted(monthly_cs.keys()):
+            data = monthly_cs[month]
+            cs_per_min = data['total_cs'] / data['total_minutes'] if data['total_minutes'] > 0 else 0
+
+            monthly_data.append({
+                'month': month,
+                'cs_per_min': round(cs_per_min, 1),
+                'games': data['games'],
+                'total_cs': data['total_cs']
+            })
+
+            total_cs_all += data['total_cs']
+            total_minutes_all += data['total_minutes']
+
+        # Calculate overall average
+        overall_cs_per_min = total_cs_all / total_minutes_all if total_minutes_all > 0 else 0
+
+        # Determine estimated rank based on CS/min
+        estimated_rank = 'Iron'
+        for rank, benchmark in sorted(cs_benchmarks.items(), key=lambda x: x[1]):
+            if overall_cs_per_min >= benchmark:
+                estimated_rank = rank
+
+        return {
+            'monthly_data': monthly_data,
+            'overall_cs_per_min': round(overall_cs_per_min, 1),
+            'total_cs': total_cs_all,
+            'estimated_rank': estimated_rank,
+            'benchmarks': cs_benchmarks
+        }

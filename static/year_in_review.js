@@ -648,6 +648,54 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
+    // Card 15: CS Efficiency
+    if (analysis.cs_efficiency) {
+        const cs = analysis.cs_efficiency;
+        const monthlyData = cs.monthly_data || [];
+
+        // Generate sparkline chart data
+        const chartPoints = monthlyData.map((m, idx) => {
+            const x = (idx / (monthlyData.length - 1)) * 100;
+            const y = 100 - ((m.cs_per_min / 10) * 100);
+            return `${x},${y}`;
+        }).join(' ');
+
+        // Get benchmark for estimated rank
+        const rankBenchmark = cs.benchmarks[cs.estimated_rank] || 5.0;
+        const percentAboveBenchmark = ((cs.overall_cs_per_min - rankBenchmark) / rankBenchmark * 100).toFixed(0);
+
+        cards.push(`
+            <div class="story-card">
+                <h2>🎯 CS Efficiency</h2>
+                <div class="stat-number">${cs.overall_cs_per_min}</div>
+                <p style="font-size: 1.3rem; margin-bottom: 20px;">CS per Minute</p>
+
+                <!-- Mini chart -->
+                <svg viewBox="0 0 100 30" style="width: 100%; height: 60px; margin: 20px 0;">
+                    <polyline points="${chartPoints}" fill="none" stroke="#C79B3B" stroke-width="2" />
+                    ${monthlyData.map((m, idx) => {
+                        const x = (idx / (monthlyData.length - 1)) * 100;
+                        const y = 100 - ((m.cs_per_min / 10) * 100);
+                        return `<circle cx="${x}" cy="${y}" r="1.5" fill="#FFD700" />`;
+                    }).join('')}
+                </svg>
+
+                <div style="margin-top: 20px; padding: 15px; background: rgba(199, 155, 59, 0.1); border-radius: 10px;">
+                    <p style="color: #C79B3B; font-size: 1.1rem; margin: 5px 0;">
+                        <strong>${cs.estimated_rank}</strong> Level Farming
+                    </p>
+                    <p style="color: #A09B8C; font-size: 0.95rem; margin: 5px 0;">
+                        ${percentAboveBenchmark > 0 ? `${percentAboveBenchmark}% above` : `${Math.abs(percentAboveBenchmark)}% below`} ${cs.estimated_rank} average
+                    </p>
+                </div>
+
+                <p style="color: #A09B8C; margin-top: 15px; font-size: 0.9rem;">
+                    Total CS: ${cs.total_cs.toLocaleString()}
+                </p>
+            </div>
+        `);
+    }
+
     // Add all cards to container (prepend before roast/share sections)
     console.log('[BUILD CARDS] Total cards built:', cards.length);
     console.log('[BUILD CARDS] Inserting cards into DOM...');
