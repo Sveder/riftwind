@@ -76,9 +76,9 @@ def cached_request(url, headers):
     if cached_data:
         return cached_data
 
-    # If not in cache, make request
+    # If not in cache, make request with timeout
     print(f"[CACHE] Cache MISS - fetching from network: {url[:80]}...")
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=30)
 
     if response.status_code == 200:
         data = response.json()
@@ -93,7 +93,7 @@ def cached_get(url, headers_tuple):
     """Cached GET request - converts tuple back to dict"""
     headers = dict(headers_tuple)
     print(f"[CACHE] Fetching from network: {url[:80]}...")
-    return requests.get(url, headers=headers)
+    return requests.get(url, headers=headers, timeout=30)
 
 # You need to get your API key from https://developer.riotgames.com/
 RIOT_API_KEY = os.environ.get('RIOT_API_KEY', 'YOUR_API_KEY_HERE')
@@ -177,7 +177,7 @@ Timestamp: {search_time}
         print(f"[ACCOUNT API] URL: {account_url}")
         print(f"[ACCOUNT API] Headers: {headers}")
 
-        account_response = requests.get(account_url, headers=headers)
+        account_response = requests.get(account_url, headers=headers, timeout=30)
         print(f"[ACCOUNT API] Status Code: {account_response.status_code}")
         print(f"[ACCOUNT API] Response: {account_response.text}")
 
@@ -192,7 +192,7 @@ Timestamp: {search_time}
         summoner_url = f'https://{region}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}'
         print(f"[SUMMONER API] URL: {summoner_url}")
 
-        summoner_response = requests.get(summoner_url, headers=headers)
+        summoner_response = requests.get(summoner_url, headers=headers, timeout=30)
         print(f"[SUMMONER API] Status Code: {summoner_response.status_code}")
         print(f"[SUMMONER API] Response: {summoner_response.text}")
 
@@ -205,7 +205,7 @@ Timestamp: {search_time}
         mastery_url = f'https://{region}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}'
         print(f"[MASTERY API] URL: {mastery_url}")
 
-        mastery_response = requests.get(mastery_url, headers=headers)
+        mastery_response = requests.get(mastery_url, headers=headers, timeout=30)
         print(f"[MASTERY API] Status Code: {mastery_response.status_code}")
         print(f"[MASTERY API] Response: {mastery_response.text[:500]}")  # First 500 chars
 
@@ -232,7 +232,7 @@ Timestamp: {search_time}
             # Try cache first
             match_ids_batch = cached_request(match_url, headers)
             if match_ids_batch is None:
-                match_response = requests.get(match_url, headers=headers)
+                match_response = requests.get(match_url, headers=headers, timeout=30)
                 print(f"[MATCH API] Status Code: {match_response.status_code}")
 
                 if match_response.status_code == 200:
@@ -241,7 +241,7 @@ Timestamp: {search_time}
                     print(f"[MATCH API] Rate limited (429), sleeping for 2 seconds...")
                     time.sleep(2)
                     # Retry once after rate limit
-                    match_response = requests.get(match_url, headers=headers)
+                    match_response = requests.get(match_url, headers=headers, timeout=30)
                     if match_response.status_code == 200:
                         match_ids_batch = match_response.json()
                     else:
@@ -277,7 +277,7 @@ Timestamp: {search_time}
             # Try cache first
             match_data = cached_request(match_detail_url, headers)
             if match_data is None:
-                detail_response = requests.get(match_detail_url, headers=headers)
+                detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
                 if detail_response.status_code == 200:
                     match_data = detail_response.json()
                     print(f"[MATCH DETAILS] Successfully fetched match {match_id}")
@@ -285,7 +285,7 @@ Timestamp: {search_time}
                     print(f"[MATCH DETAILS] Rate limited (429) on match {match_id}, sleeping for 1 second...")
                     time.sleep(1)
                     # Retry once after rate limit
-                    detail_response = requests.get(match_detail_url, headers=headers)
+                    detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
                     if detail_response.status_code == 200:
                         match_data = detail_response.json()
                         print(f"[MATCH DETAILS] Successfully fetched match {match_id} after retry")
@@ -309,7 +309,7 @@ Timestamp: {search_time}
             print(f"[TIMELINE] Fetching timeline for first match: {first_match_id}")
             print(f"[TIMELINE] URL: {timeline_url}")
 
-            timeline_response = requests.get(timeline_url, headers=headers)
+            timeline_response = requests.get(timeline_url, headers=headers, timeout=30)
             print(f"[TIMELINE] Status Code: {timeline_response.status_code}")
 
             if timeline_response.status_code == 200:
@@ -706,11 +706,11 @@ def get_champion_name(champion_id):
     # Get latest champion data
     try:
         version_url = 'https://ddragon.leagueoflegends.com/api/versions.json'
-        version_response = requests.get(version_url)
+        version_response = requests.get(version_url, timeout=30)
         latest_version = version_response.json()[0]
 
         champion_url = f'https://ddragon.leagueoflegends.com/cdn/{latest_version}/data/en_US/champion.json'
-        champion_response = requests.get(champion_url)
+        champion_response = requests.get(champion_url, timeout=30)
         champions = champion_response.json()['data']
 
         for champ_name, champ_data in champions.items():
