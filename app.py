@@ -132,6 +132,11 @@ def riot_verification():
 def year_in_review():
     return render_template('year_in_review.html')
 
+@app.route('/year-in-review-map')
+def year_in_review_map():
+    """Experimental isometric map view"""
+    return render_template('year_in_review_map.html')
+
 @app.route('/api/summoner', methods=['POST'])
 @cache.cached(timeout=300, key_prefix=lambda: f"summoner_{request.json.get('gameName')}_{request.json.get('tagLine')}_{request.json.get('region')}")
 def get_summoner_data():
