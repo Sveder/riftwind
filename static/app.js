@@ -63,7 +63,31 @@ $(document).ready(function() {
         // Save data to localStorage for year-in-review
         const region = $('#region').val();
         data.region = region;
-        localStorage.setItem('summonerData', JSON.stringify(data));
+
+        // Store timelines separately to avoid quota issues
+        const timelines = data.matchTimelines;
+        const dataWithoutTimelines = {...data};
+        delete dataWithoutTimelines.matchTimelines;
+
+        try {
+            localStorage.setItem('summonerData', JSON.stringify(dataWithoutTimelines));
+            // Store timelines separately with a key
+            if (timelines && timelines.length > 0) {
+                localStorage.setItem('matchTimelines', JSON.stringify(timelines));
+            }
+        } catch (e) {
+            console.error('Failed to save to localStorage:', e);
+            // If still too large, just save essential data
+            const minimalData = {
+                summoner: data.summoner,
+                recentMatches: data.recentMatches,
+                region: region
+            };
+            localStorage.setItem('summonerData', JSON.stringify(minimalData));
+            if (timelines && timelines.length > 0) {
+                localStorage.setItem('matchTimelines', JSON.stringify(timelines));
+            }
+        }
 
         // Hide loading
         $('.loading').hide();

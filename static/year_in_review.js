@@ -54,6 +54,20 @@ function startReview() {
     }
 
     const data = JSON.parse(summonerData);
+
+    // Retrieve timelines separately
+    const timelinesData = localStorage.getItem('matchTimelines');
+    if (timelinesData) {
+        try {
+            data.matchTimelines = JSON.parse(timelinesData);
+            console.log('[YEAR IN REVIEW] Loaded', data.matchTimelines.length, 'timelines from storage');
+        } catch (e) {
+            console.error('[YEAR IN REVIEW] Failed to parse timelines:', e);
+            data.matchTimelines = [];
+        }
+    } else {
+        data.matchTimelines = [];
+    }
     console.log('[YEAR IN REVIEW] Summoner data loaded:', data.summoner.name);
     console.log('[YEAR IN REVIEW] Total matches to analyze:', data.recentMatches.length);
 
