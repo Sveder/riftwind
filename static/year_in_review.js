@@ -113,9 +113,9 @@ function showPreviewStats(summonerData) {
                 </div>
             `;
 
-            // Store summoner data for later (both in window and sessionStorage)
+            // Store summoner data for later
+            // Only use window storage - sessionStorage has quota issues with large timeline data
             window.currentSummonerData = summonerData;
-            sessionStorage.setItem('currentSummonerData', JSON.stringify(summonerData));
         },
         error: function(xhr) {
             console.error('[PREVIEW] Error getting preview:', xhr);
