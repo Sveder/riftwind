@@ -113,8 +113,9 @@ function showPreviewStats(summonerData) {
                 </div>
             `;
 
-            // Store summoner data for later
+            // Store summoner data for later (both in window and sessionStorage)
             window.currentSummonerData = summonerData;
+            sessionStorage.setItem('currentSummonerData', JSON.stringify(summonerData));
         },
         error: function(xhr) {
             console.error('[PREVIEW] Error getting preview:', xhr);

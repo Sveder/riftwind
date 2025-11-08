@@ -165,9 +165,21 @@ function updateViewport() {
 function loadYearInReview() {
     console.log('[MAP] Loading year in review data...');
 
-    // Get data from window (passed from index page) or make API call
-    if (window.currentSummonerData) {
-        generateMapCards(window.currentSummonerData);
+    // Get data from window or sessionStorage
+    let summonerData = window.currentSummonerData;
+
+    if (!summonerData) {
+        // Try to load from sessionStorage
+        const stored = sessionStorage.getItem('currentSummonerData');
+        if (stored) {
+            summonerData = JSON.parse(stored);
+            window.currentSummonerData = summonerData;
+            console.log('[MAP] Loaded summoner data from sessionStorage');
+        }
+    }
+
+    if (summonerData) {
+        generateMapCards(summonerData);
     } else {
         // Redirect back to index if no data
         console.log('[MAP] No summoner data found, redirecting...');
