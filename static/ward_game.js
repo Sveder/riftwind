@@ -8,6 +8,7 @@ const game = {
     canvas: null,
     ctx: null,
     mapImage: new Image(),
+    wardImage: new Image(),
     wards: [],
     maxWards: 3,
     minions: [],
@@ -57,6 +58,12 @@ $(document).ready(function() {
     game.mapImage.onload = function() {
         console.log('[WARD GAME] Map loaded');
         drawGame();
+    };
+
+    // Load ward image
+    game.wardImage.src = '/static/ward.png';
+    game.wardImage.onload = function() {
+        console.log('[WARD GAME] Ward image loaded');
     };
 
     // Show instructions modal
@@ -267,14 +274,20 @@ function drawGame() {
 
     // Draw wards first (under fog)
     game.wards.forEach(ward => {
-        // Ward indicator (simple circle) - white/gray
-        ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(ward.x, ward.y, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        // Draw ward icon image if loaded
+        if (game.wardImage.complete && game.wardImage.naturalWidth > 0) {
+            const iconSize = 24; // Small ward icon
+            ctx.drawImage(game.wardImage, ward.x - iconSize/2, ward.y - iconSize/2, iconSize, iconSize);
+        } else {
+            // Fallback to circle if image not loaded
+            ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(ward.x, ward.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
 
         // Timer bar
         const barWidth = 30;
@@ -282,10 +295,10 @@ function drawGame() {
         const timePercent = ward.timeRemaining / ward.maxDuration;
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(ward.x - barWidth/2, ward.y + 15, barWidth, barHeight);
+        ctx.fillRect(ward.x - barWidth/2, ward.y + 18, barWidth, barHeight);
 
         ctx.fillStyle = timePercent > 0.3 ? '#CCCCCC' : '#FF6B6B';
-        ctx.fillRect(ward.x - barWidth/2, ward.y + 15, barWidth * timePercent, barHeight);
+        ctx.fillRect(ward.x - barWidth/2, ward.y + 18, barWidth * timePercent, barHeight);
     });
 
     // Draw fog of war
