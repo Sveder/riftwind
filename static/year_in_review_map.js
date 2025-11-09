@@ -111,8 +111,7 @@ function setupNavigation() {
             mapState.lastMouseX = e.clientX;
             mapState.lastMouseY = e.clientY;
 
-            updateViewport();
-            checkCardVisibility();
+            updateViewport(true); // Pass true to skip transition during drag
         }
     });
 
@@ -120,6 +119,7 @@ function setupNavigation() {
         if (mapState.isDragging) {
             mapState.isDragging = false;
             container.css('cursor', 'grab');
+            checkCardVisibility(); // Check visibility once after drag ends
         }
     });
 
@@ -230,7 +230,7 @@ function setupNavigation() {
     console.log('[MAP] ✅ Navigation controls ready');
 }
 
-function updateViewport() {
+function updateViewport(skipTransition = false) {
     const viewport = $('#mapViewport');
     const container = $('#mapContainer');
 
@@ -269,11 +269,20 @@ function updateViewport() {
     mapState.x = Math.max(minX, Math.min(maxX, mapState.x));
     mapState.y = Math.max(minY, Math.min(maxY, mapState.y));
 
-    // Apply transform
-    viewport.css({
-        'transform': `translate(${mapState.x}px, ${mapState.y}px) scale(${mapState.zoom})`,
-        'transform-origin': '0 0'
-    });
+    // Apply transform with or without transition
+    if (skipTransition) {
+        viewport.css({
+            'transform': `translate(${mapState.x}px, ${mapState.y}px) scale(${mapState.zoom})`,
+            'transform-origin': '0 0',
+            'transition': 'none'
+        });
+    } else {
+        viewport.css({
+            'transform': `translate(${mapState.x}px, ${mapState.y}px) scale(${mapState.zoom})`,
+            'transform-origin': '0 0',
+            'transition': 'transform 0.1s ease-out'
+        });
+    }
 }
 
 async function loadYearInReview() {
