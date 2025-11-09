@@ -267,9 +267,9 @@ function drawGame() {
 
     // Draw wards first (under fog)
     game.wards.forEach(ward => {
-        // Ward indicator (simple circle)
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.5)';
-        ctx.strokeStyle = '#FFD700';
+        // Ward indicator (simple circle) - white/gray
+        ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
+        ctx.strokeStyle = '#FFFFFF';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(ward.x, ward.y, 8, 0, Math.PI * 2);
@@ -284,7 +284,7 @@ function drawGame() {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillRect(ward.x - barWidth/2, ward.y + 15, barWidth, barHeight);
 
-        ctx.fillStyle = timePercent > 0.3 ? '#FFD700' : '#FF6B6B';
+        ctx.fillStyle = timePercent > 0.3 ? '#CCCCCC' : '#FF6B6B';
         ctx.fillRect(ward.x - barWidth/2, ward.y + 15, barWidth * timePercent, barHeight);
     });
 
