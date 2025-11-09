@@ -138,6 +138,11 @@ def year_in_review_map():
     """Experimental isometric map view"""
     return render_template('year_in_review_map.html')
 
+@app.route('/ward-game')
+def ward_game():
+    """Ward placement mini-game"""
+    return render_template('ward_game.html')
+
 @app.route('/api/summoner', methods=['POST'])
 @cache.cached(timeout=300, key_prefix=lambda: f"summoner_{request.json.get('gameName')}_{request.json.get('tagLine')}_{request.json.get('region')}")
 def get_summoner_data():
