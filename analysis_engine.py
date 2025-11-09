@@ -10,6 +10,10 @@ from collections import defaultdict, Counter
 # AWS Bedrock Configuration
 MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 
+# AWS Bedrock Knowledge Base Configuration
+# Replace with your Knowledge Base ID from AWS Console
+KNOWLEDGE_BASE_ID = "YOUR_KNOWLEDGE_BASE_ID"  # e.g., "ABCDEF1234"
+
 
 class YearInReviewAnalyzer:
     """Analyzes League of Legends match data and generates AI-powered insights"""
@@ -20,6 +24,7 @@ class YearInReviewAnalyzer:
         self.region = region
         self.timelines = timelines or []
         self.bedrock_client = boto3.client('bedrock-runtime', region_name='eu-central-1')
+        self.bedrock_agent_client = boto3.client('bedrock-agent-runtime', region_name='eu-central-1')
 
     def analyze_all(self):
         """Run all analysis and generate comprehensive year-in-review"""
@@ -1073,6 +1078,88 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
             import traceback
             traceback.print_exc()
             return None
+
+    def query_knowledge_base(self, query_text, max_results=5):
+        """Query the Bedrock Knowledge Base for League of Legends insights"""
+        try:
+            if KNOWLEDGE_BASE_ID == "YOUR_KNOWLEDGE_BASE_ID":
+                print("[KB] Knowledge Base ID not configured, skipping...")
+                return None
+
+            print(f"[KB] Querying knowledge base: {query_text[:100]}...")
+
+            response = self.bedrock_agent_client.retrieve(
+                knowledgeBaseId=KNOWLEDGE_BASE_ID,
+                retrievalQuery={
+                    'text': query_text
+                },
+                retrievalConfiguration={
+                    'vectorSearchConfiguration': {
+                        'numberOfResults': max_results
+                    }
+                }
+            )
+
+            # Extract relevant context from results
+            contexts = []
+            for result in response.get('retrievalResults', []):
+                content = result.get('content', {}).get('text', '')
+                if content:
+                    contexts.append(content)
+
+            combined_context = "\n\n".join(contexts) if contexts else None
+            print(f"[KB] ✅ Retrieved {len(contexts)} relevant documents")
+            return combined_context
+
+        except Exception as e:
+            print(f"[KB] ❌ Error querying knowledge base: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def generate_roast_with_kb(self, player_context):
+        """Generate roast using Knowledge Base + Retrieve and Generate"""
+        try:
+            if KNOWLEDGE_BASE_ID == "YOUR_KNOWLEDGE_BASE_ID":
+                print("[ROAST KB] Knowledge Base not configured, using standard method")
+                return self.generate_roast()
+
+            print("[ROAST KB] Generating roast with knowledge base context...")
+
+            # Use RetrieveAndGenerate API for RAG
+            response = self.bedrock_agent_client.retrieve_and_generate(
+                input={
+                    'text': f"""You are a SAVAGE League of Legends roaster. Based on this player's stats and League of Legends knowledge, generate 2-4 hilarious roast lines. Be creative, witty, and ruthless (but playful)!
+
+Player Stats:
+{player_context}
+
+Use your knowledge of League of Legends meta, champion abilities, and gameplay strategies to make the roast more accurate and funnier!"""
+                },
+                retrieveAndGenerateConfiguration={
+                    'type': 'KNOWLEDGE_BASE',
+                    'knowledgeBaseConfiguration': {
+                        'knowledgeBaseId': KNOWLEDGE_BASE_ID,
+                        'modelArn': f'arn:aws:bedrock:eu-central-1::foundation-model/{MODEL_ID}',
+                        'retrievalConfiguration': {
+                            'vectorSearchConfiguration': {
+                                'numberOfResults': 5
+                            }
+                        }
+                    }
+                }
+            )
+
+            roast = response['output']['text']
+            print(f"[ROAST KB] ✅ Generated roast with KB: {roast[:100]}...")
+            return roast
+
+        except Exception as e:
+            print(f"[ROAST KB] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to regular roast
+            return self.generate_roast()
 
     def generate_roast(self):
         """Generate a savage roast using AI with COMPREHENSIVE data"""
