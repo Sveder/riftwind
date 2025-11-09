@@ -875,6 +875,294 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
+    // Card 17: Tilt Detection
+    if (analysis.tilt_detection) {
+        const tilt = analysis.tilt_detection;
+        const tiltColor = tilt.is_tilting ? '#C73B3B' : '#3BC77B';
+        const tiltEmoji = tilt.is_tilting ? '🔥' : '🧘';
+        const tiltStatus = tilt.is_tilting ? 'Tilt Detected' : 'Mental Fortress';
+
+        cards.push(`
+            <div class="story-card">
+                <h2>${tiltEmoji} Tilt Analysis</h2>
+                <h3 style="color: ${tiltColor}; font-size: 1.8rem; margin-bottom: 20px;">${tiltStatus}</h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">Normal WR</p>
+                        <p style="color: #3BC77B; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_normal}%</p>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">After 2 Losses</p>
+                        <p style="color: ${tilt.wr_after_2_losses < tilt.wr_normal ? '#C73B3B' : '#3BC77B'}; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_after_2_losses}%</p>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">After 3 Losses</p>
+                        <p style="color: ${tilt.wr_after_3_losses < tilt.wr_normal ? '#C73B3B' : '#3BC77B'}; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_after_3_losses}%</p>
+                    </div>
+                </div>
+
+                ${tilt.is_tilting ? `
+                    <div style="margin-top: 20px; padding: 15px; background: rgba(199, 59, 59, 0.1); border-radius: 10px; border-left: 3px solid #C73B3B;">
+                        <p style="color: #C73B3B; font-size: 1.1rem; margin: 5px 0; font-weight: bold;">
+                            Warning: Tilt Pattern Detected
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.95rem; margin: 10px 0;">
+                            Your win rate drops ${tilt.tilt_drop_2_losses}% after losing 2 games in a row
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.85rem; margin: 5px 0; font-style: italic;">
+                            Consider taking a break after back-to-back losses!
+                        </p>
+                    </div>
+                ` : `
+                    <div style="margin-top: 20px; padding: 15px; background: rgba(59, 199, 123, 0.1); border-radius: 10px; border-left: 3px solid #3BC77B;">
+                        <p style="color: #3BC77B; font-size: 1.1rem; margin: 5px 0; font-weight: bold;">
+                            Mental Resilience
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.95rem; margin: 10px 0;">
+                            You maintain composure after losses - keep it up!
+                        </p>
+                    </div>
+                `}
+
+                <div style="margin-top: 15px; display: flex; justify-content: space-between;">
+                    <div style="text-align: center;">
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">Tilt Episodes</p>
+                        <p style="color: #E4E1D8; font-size: 1.2rem; font-weight: bold; margin: 0;">${tilt.tilt_episodes}</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">Longest Loss Streak</p>
+                        <p style="color: #E4E1D8; font-size: 1.2rem; font-weight: bold; margin: 0;">${tilt.longest_loss_streak}</p>
+                    </div>
+                </div>
+            </div>
+        `);
+    }
+
+    // Card 18: Champion Fatigue
+    if (analysis.champion_fatigue && analysis.champion_fatigue.has_fatigue) {
+        const fatigue = analysis.champion_fatigue;
+        const topFatigue = fatigue.fatigued_champions[0];
+
+        cards.push(`
+            <div class="story-card">
+                <h2>😴 Champion Fatigue</h2>
+                <h3 style="color: #C79B3B; font-size: 1.5rem; margin-bottom: 20px;">Performance Drop on Repeat Picks</h3>
+
+                ${topFatigue ? `
+                    <div style="background: rgba(199, 59, 59, 0.1); border: 2px solid #C73B3B; border-radius: 15px; padding: 20px; margin-bottom: 20px;">
+                        <p style="color: #C73B3B; font-size: 1.3rem; margin-bottom: 15px; font-weight: bold;">${topFatigue.champion}</p>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div style="background: rgba(59, 199, 123, 0.1); padding: 12px; border-radius: 8px;">
+                                <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">Games 1-3</p>
+                                <p style="color: #3BC77B; font-size: 1.4rem; font-weight: bold; margin: 0;">${topFatigue.early_wr}%</p>
+                                <p style="color: #A09B8C; font-size: 0.75rem; margin-top: 3px;">${topFatigue.early_games} games</p>
+                            </div>
+                            <div style="background: rgba(199, 59, 59, 0.1); padding: 12px; border-radius: 8px;">
+                                <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">Games 5+</p>
+                                <p style="color: #C73B3B; font-size: 1.4rem; font-weight: bold; margin: 0;">${topFatigue.late_wr}%</p>
+                                <p style="color: #A09B8C; font-size: 0.75rem; margin-top: 3px;">${topFatigue.late_games} games</p>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px;">
+                            <p style="color: #C73B3B; font-size: 1.2rem; font-weight: bold; margin: 0;">
+                                -${topFatigue.drop}% Win Rate Drop
+                            </p>
+                            <p style="color: #A09B8C; font-size: 0.85rem; margin-top: 5px;">
+                                After playing ${topFatigue.champion} repeatedly
+                            </p>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${fatigue.fatigued_champions.length > 1 ? `
+                    <div style="margin-top: 15px;">
+                        <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 10px;">Other Fatigued Champions:</p>
+                        ${fatigue.fatigued_champions.slice(1, 3).map(champ => `
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+                                <span style="color: #E4E1D8; font-weight: bold;">${champ.champion}</span>
+                                <span style="color: #C73B3B; margin-left: 10px;">-${champ.drop}%</span>
+                                <span style="color: #A09B8C; font-size: 0.85rem; margin-left: 10px;">(${champ.early_wr}% → ${champ.late_wr}%)</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+
+                <p style="color: #A09B8C; margin-top: 20px; font-size: 0.85rem; font-style: italic;">
+                    💡 Tip: Mix up your champion pool to avoid fatigue!
+                </p>
+            </div>
+        `);
+    }
+
+    // Card 19: Learning Curves
+    if (analysis.learning_curves) {
+        const learning = analysis.learning_curves;
+        const improvementColor = learning.is_improving ? '#3BC77B' : '#C79B3B';
+        const improvementEmoji = learning.is_improving ? '📈' : '📊';
+
+        cards.push(`
+            <div class="story-card">
+                <h2>${improvementEmoji} Learning Curve</h2>
+                <h3 style="color: ${improvementColor}; font-size: 1.5rem; margin-bottom: 20px;">
+                    ${learning.is_improving ? 'Leveling Up!' : 'Holding Steady'}
+                </h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+                    <!-- CS/min Progress -->
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.85rem; margin-bottom: 10px; text-align: center;">CS/min</p>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <div>
+                                <p style="color: #A09B8C; font-size: 0.7rem;">Early</p>
+                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.cs_per_min.early}</p>
+                            </div>
+                            <div style="text-align: center;">
+                                <p style="color: #C79B3B; font-size: 0.7rem;">→</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <p style="color: #A09B8C; font-size: 0.7rem;">Late</p>
+                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.cs_per_min.late}</p>
+                            </div>
+                        </div>
+                        <p style="color: ${learning.cs_per_min.improvement > 0 ? '#3BC77B' : '#C73B3B'}; font-size: 0.9rem; text-align: center; font-weight: bold;">
+                            ${learning.cs_per_min.improvement > 0 ? '+' : ''}${learning.cs_per_min.improvement}
+                        </p>
+                    </div>
+
+                    <!-- KDA Progress -->
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.85rem; margin-bottom: 10px; text-align: center;">KDA</p>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <div>
+                                <p style="color: #A09B8C; font-size: 0.7rem;">Early</p>
+                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.kda.early}</p>
+                            </div>
+                            <div style="text-align: center;">
+                                <p style="color: #C79B3B; font-size: 0.7rem;">→</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <p style="color: #A09B8C; font-size: 0.7rem;">Late</p>
+                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.kda.late}</p>
+                            </div>
+                        </div>
+                        <p style="color: ${learning.kda.improvement > 0 ? '#3BC77B' : '#C73B3B'}; font-size: 0.9rem; text-align: center; font-weight: bold;">
+                            ${learning.kda.improvement > 0 ? '+' : ''}${learning.kda.improvement}
+                        </p>
+                    </div>
+
+                    <!-- Win Rate Progress -->
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.85rem; margin-bottom: 10px; text-align: center;">Win Rate</p>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <div>
+                                <p style="color: #A09B8C; font-size: 0.7rem;">Early</p>
+                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.winrate.early}%</p>
+                            </div>
+                            <div style="text-align: center;">
+                                <p style="color: #C79B3B; font-size: 0.7rem;">→</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <p style="color: #A09B8C; font-size: 0.7rem;">Late</p>
+                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.winrate.late}%</p>
+                            </div>
+                        </div>
+                        <p style="color: ${learning.winrate.improvement > 0 ? '#3BC77B' : '#C73B3B'}; font-size: 0.9rem; text-align: center; font-weight: bold;">
+                            ${learning.winrate.improvement > 0 ? '+' : ''}${learning.winrate.improvement}%
+                        </p>
+                    </div>
+                </div>
+
+                ${learning.is_improving ? `
+                    <div style="background: rgba(59, 199, 123, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #3BC77B;">
+                        <p style="color: #3BC77B; font-size: 1.1rem; margin: 0; font-weight: bold;">
+                            You're on the grind! 💪
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
+                            Your performance has measurably improved over the year
+                        </p>
+                    </div>
+                ` : `
+                    <div style="background: rgba(199, 155, 59, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #C79B3B;">
+                        <p style="color: #C79B3B; font-size: 1.1rem; margin: 0; font-weight: bold;">
+                            Consistent Performance
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
+                            You're maintaining your skill level
+                        </p>
+                    </div>
+                `}
+            </div>
+        `);
+    }
+
+    // Card 20: Meta Adaptation
+    if (analysis.meta_adaptation) {
+        const meta = analysis.meta_adaptation;
+        const adaptColor = meta.is_adapting ? '#3BC77B' : '#C79B3B';
+
+        cards.push(`
+            <div class="story-card">
+                <h2>🔄 Meta Adaptation</h2>
+                <h3 style="color: ${adaptColor}; font-size: 1.5rem; margin-bottom: 20px;">
+                    ${meta.is_adapting ? 'Meta Chaser' : 'Creature of Habit'}
+                </h3>
+
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 10px;">Patches Played: <strong style="color: #E4E1D8;">${meta.patches_played}</strong></p>
+                    <p style="color: #A09B8C; font-size: 0.9rem; margin: 0;">Diversity Score: <strong style="color: ${adaptColor};">${meta.avg_diversity_score}</strong></p>
+                    <p style="color: #A09B8C; font-size: 0.75rem; margin-top: 5px; font-style: italic;">
+                        (Higher = more champion variety per patch)
+                    </p>
+                </div>
+
+                ${meta.patch_data && meta.patch_data.length > 0 ? `
+                    <div style="margin-top: 15px;">
+                        <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 10px;">Recent Patches:</p>
+                        ${meta.patch_data.slice(0, 3).map(patch => `
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <span style="color: #C79B3B; font-weight: bold;">Patch ${patch.patch}</span>
+                                        <span style="color: #A09B8C; font-size: 0.85rem; margin-left: 10px;">${patch.games} games</span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span style="color: ${patch.winrate >= 50 ? '#3BC77B' : '#C73B3B'}; font-weight: bold;">${patch.winrate}%</span>
+                                    </div>
+                                </div>
+                                <p style="color: #A09B8C; font-size: 0.75rem; margin-top: 5px;">
+                                    ${patch.unique_champions} unique champions
+                                </p>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+
+                ${meta.is_adapting ? `
+                    <div style="margin-top: 20px; background: rgba(59, 199, 123, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #3BC77B;">
+                        <p style="color: #3BC77B; font-size: 1.1rem; margin: 0; font-weight: bold;">
+                            Adapting to the Meta
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
+                            You explore different champions each patch - keeping up with the meta!
+                        </p>
+                    </div>
+                ` : `
+                    <div style="margin-top: 20px; background: rgba(199, 155, 59, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #C79B3B;">
+                        <p style="color: #C79B3B; font-size: 1.1rem; margin: 0; font-weight: bold;">
+                            Comfort Pick Player
+                        </p>
+                        <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
+                            You stick to your favorite champions regardless of patch changes
+                        </p>
+                    </div>
+                `}
+            </div>
+        `);
+    }
+
     // Add all cards to container (prepend before roast/share sections)
     console.log('[BUILD CARDS] Total cards built:', cards.length);
     console.log('[BUILD CARDS] Inserting cards into DOM...');

@@ -82,6 +82,18 @@ class YearInReviewAnalyzer:
         print("[ANALYZER] Analyzing build choices...")
         build_comparison = self.analyze_build_mistakes()
 
+        print("[ANALYZER] Detecting tilt patterns...")
+        tilt_detection = self.detect_tilt_patterns()
+
+        print("[ANALYZER] Analyzing champion fatigue...")
+        champion_fatigue = self.detect_champion_fatigue()
+
+        print("[ANALYZER] Analyzing learning curves...")
+        learning_curves = self.analyze_learning_curves()
+
+        print("[ANALYZER] Analyzing meta adaptation...")
+        meta_adaptation = self.analyze_meta_adaptation()
+
         print("[ANALYZER] ✅ All analysis complete!")
 
         return {
@@ -103,7 +115,11 @@ class YearInReviewAnalyzer:
             'total_hours': total_hours,
             'cs_efficiency': cs_efficiency,
             'kill_steals': kill_steals,
-            'build_comparison': build_comparison
+            'build_comparison': build_comparison,
+            'tilt_detection': tilt_detection,
+            'champion_fatigue': champion_fatigue,
+            'learning_curves': learning_curves,
+            'meta_adaptation': meta_adaptation
         }
 
     def find_nemesis(self):
@@ -751,6 +767,309 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
 
         except Exception as e:
             print(f"[BUILD ANALYSIS] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def detect_tilt_patterns(self):
+        """Detect tilt patterns: win rate drops after consecutive losses"""
+        print("[TILT DETECTION] Analyzing tilt patterns...")
+
+        try:
+            if len(self.matches) < 10:
+                return None
+
+            # Reverse to chronological order (oldest first)
+            matches = list(reversed(self.matches))
+
+            tilt_episodes = []
+            loss_streak = 0
+            baseline_winrate = sum(1 for m in matches if m['win']) / len(matches)
+
+            # Track performance after losses
+            games_after_2_losses = []
+            games_after_3_losses = []
+            normal_games = []
+
+            for i, match in enumerate(matches):
+                # Check previous games
+                if i >= 2:
+                    prev_2 = matches[i-2:i]
+                    if all(not m['win'] for m in prev_2):
+                        # After 2+ losses
+                        games_after_2_losses.append(match)
+
+                if i >= 3:
+                    prev_3 = matches[i-3:i]
+                    if all(not m['win'] for m in prev_3):
+                        # After 3+ losses
+                        games_after_3_losses.append(match)
+
+                # Track normal baseline (no recent losses)
+                if i >= 2:
+                    prev_2 = matches[i-2:i]
+                    if any(m['win'] for m in prev_2):
+                        normal_games.append(match)
+
+                # Track loss streaks
+                if not match['win']:
+                    loss_streak += 1
+                else:
+                    if loss_streak >= 3:
+                        # End of tilt episode
+                        tilt_episodes.append({
+                            'length': loss_streak,
+                            'ended_at': i
+                        })
+                    loss_streak = 0
+
+            # Calculate win rates
+            wr_after_2_losses = (sum(1 for m in games_after_2_losses if m['win']) / len(games_after_2_losses) * 100) if games_after_2_losses else 0
+            wr_after_3_losses = (sum(1 for m in games_after_3_losses if m['win']) / len(games_after_3_losses) * 100) if games_after_3_losses else 0
+            wr_normal = (sum(1 for m in normal_games if m['win']) / len(normal_games) * 100) if normal_games else baseline_winrate * 100
+
+            # Detect significant tilt
+            tilt_drop_2_losses = wr_normal - wr_after_2_losses
+            tilt_drop_3_losses = wr_normal - wr_after_3_losses
+            is_tilting = tilt_drop_2_losses >= 15 or tilt_drop_3_losses >= 20
+
+            longest_loss_streak = max([ep['length'] for ep in tilt_episodes], default=0)
+
+            return {
+                'is_tilting': is_tilting,
+                'baseline_winrate': round(baseline_winrate * 100, 1),
+                'wr_after_2_losses': round(wr_after_2_losses, 1),
+                'wr_after_3_losses': round(wr_after_3_losses, 1),
+                'wr_normal': round(wr_normal, 1),
+                'tilt_drop_2_losses': round(tilt_drop_2_losses, 1),
+                'tilt_drop_3_losses': round(tilt_drop_3_losses, 1),
+                'games_analyzed_after_2_losses': len(games_after_2_losses),
+                'games_analyzed_after_3_losses': len(games_after_3_losses),
+                'tilt_episodes': len(tilt_episodes),
+                'longest_loss_streak': longest_loss_streak
+            }
+
+        except Exception as e:
+            print(f"[TILT DETECTION] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def detect_champion_fatigue(self):
+        """Detect champion fatigue: win rate drops after playing same champ consecutively"""
+        print("[CHAMPION FATIGUE] Analyzing champion fatigue...")
+
+        try:
+            if len(self.matches) < 20:
+                return None
+
+            # Reverse to chronological order
+            matches = list(reversed(self.matches))
+
+            # Track performance by game number on same champion
+            champion_sessions = {}  # {champion: {game_num: [wins]}}
+            current_champ = None
+            games_on_champ = 0
+
+            for match in matches:
+                champ = match['championName']
+
+                if champ != current_champ:
+                    # New champion session
+                    current_champ = champ
+                    games_on_champ = 1
+                else:
+                    games_on_champ += 1
+
+                # Track performance by game number
+                if champ not in champion_sessions:
+                    champion_sessions[champ] = defaultdict(list)
+
+                champion_sessions[champ][games_on_champ].append(match['win'])
+
+            # Find fatigue patterns
+            fatigue_detected = []
+
+            for champ, sessions in champion_sessions.items():
+                if len(sessions) < 5:
+                    continue
+
+                # Compare first 3 games vs games 5+
+                early_games = []
+                late_games = []
+
+                for game_num, results in sessions.items():
+                    if game_num <= 3:
+                        early_games.extend(results)
+                    elif game_num >= 5:
+                        late_games.extend(results)
+
+                if len(early_games) >= 3 and len(late_games) >= 3:
+                    early_wr = sum(early_games) / len(early_games) * 100
+                    late_wr = sum(late_games) / len(late_games) * 100
+                    drop = early_wr - late_wr
+
+                    if drop >= 15:
+                        fatigue_detected.append({
+                            'champion': champ,
+                            'early_wr': round(early_wr, 1),
+                            'late_wr': round(late_wr, 1),
+                            'drop': round(drop, 1),
+                            'early_games': len(early_games),
+                            'late_games': len(late_games)
+                        })
+
+            # Sort by biggest drop
+            fatigue_detected.sort(key=lambda x: x['drop'], reverse=True)
+
+            has_fatigue = len(fatigue_detected) > 0
+
+            return {
+                'has_fatigue': has_fatigue,
+                'fatigued_champions': fatigue_detected[:3],  # Top 3
+                'champions_analyzed': len(champion_sessions)
+            }
+
+        except Exception as e:
+            print(f"[CHAMPION FATIGUE] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def analyze_learning_curves(self):
+        """Analyze learning curves: CS/min improving over time, KDA improvements"""
+        print("[LEARNING CURVES] Analyzing learning curves...")
+
+        try:
+            if len(self.matches) < 30:
+                return None
+
+            # Reverse to chronological order
+            matches = list(reversed(self.matches))
+
+            # Split into early and late periods
+            chunk_size = len(matches) // 3
+            early_matches = matches[:chunk_size]
+            mid_matches = matches[chunk_size:chunk_size*2]
+            late_matches = matches[chunk_size*2:]
+
+            def calc_avg_cs_per_min(match_list):
+                cs_rates = []
+                for m in match_list:
+                    duration_min = m.get('gameDuration', 0) / 60
+                    if duration_min > 0:
+                        cs = m.get('totalMinionsKilled', 0) + m.get('neutralMinionsKilled', 0)
+                        cs_rates.append(cs / duration_min)
+                return sum(cs_rates) / len(cs_rates) if cs_rates else 0
+
+            def calc_avg_kda(match_list):
+                kdas = [(m['kills'] + m['assists']) / max(m['deaths'], 1) for m in match_list]
+                return sum(kdas) / len(kdas) if kdas else 0
+
+            def calc_winrate(match_list):
+                wins = sum(1 for m in match_list if m['win'])
+                return (wins / len(match_list) * 100) if match_list else 0
+
+            # Calculate metrics for each period
+            early_cs = calc_avg_cs_per_min(early_matches)
+            mid_cs = calc_avg_cs_per_min(mid_matches)
+            late_cs = calc_avg_cs_per_min(late_matches)
+
+            early_kda = calc_avg_kda(early_matches)
+            mid_kda = calc_avg_kda(mid_matches)
+            late_kda = calc_avg_kda(late_matches)
+
+            early_wr = calc_winrate(early_matches)
+            mid_wr = calc_winrate(mid_matches)
+            late_wr = calc_winrate(late_matches)
+
+            # Calculate improvements
+            cs_improvement = late_cs - early_cs
+            kda_improvement = late_kda - early_kda
+            wr_improvement = late_wr - early_wr
+
+            is_improving = cs_improvement > 0.5 or kda_improvement > 0.3 or wr_improvement > 5
+
+            return {
+                'is_improving': is_improving,
+                'cs_per_min': {
+                    'early': round(early_cs, 2),
+                    'mid': round(mid_cs, 2),
+                    'late': round(late_cs, 2),
+                    'improvement': round(cs_improvement, 2)
+                },
+                'kda': {
+                    'early': round(early_kda, 2),
+                    'mid': round(mid_kda, 2),
+                    'late': round(late_kda, 2),
+                    'improvement': round(kda_improvement, 2)
+                },
+                'winrate': {
+                    'early': round(early_wr, 1),
+                    'mid': round(mid_wr, 1),
+                    'late': round(late_wr, 1),
+                    'improvement': round(wr_improvement, 1)
+                }
+            }
+
+        except Exception as e:
+            print(f"[LEARNING CURVES] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def analyze_meta_adaptation(self):
+        """Analyze how quickly player adapts to meta changes"""
+        print("[META ADAPTATION] Analyzing meta adaptation...")
+
+        try:
+            if len(self.matches) < 20:
+                return None
+
+            # Group matches by patch version
+            patch_stats = defaultdict(lambda: {'games': 0, 'wins': 0, 'champions': set()})
+
+            for match in self.matches:
+                patch = match.get('gameVersion', 'Unknown')
+                # Extract major.minor patch (e.g., "14.23.604.8681" -> "14.23")
+                if patch and '.' in patch:
+                    parts = patch.split('.')
+                    if len(parts) >= 2:
+                        patch = f"{parts[0]}.{parts[1]}"
+
+                patch_stats[patch]['games'] += 1
+                if match['win']:
+                    patch_stats[patch]['wins'] += 1
+                patch_stats[patch]['champions'].add(match['championName'])
+
+            # Sort patches by game count
+            patches = sorted(patch_stats.items(), key=lambda x: x[1]['games'], reverse=True)
+
+            # Calculate champion diversity per patch
+            patch_data = []
+            for patch, stats in patches[:5]:  # Top 5 patches
+                wr = (stats['wins'] / stats['games'] * 100) if stats['games'] > 0 else 0
+                patch_data.append({
+                    'patch': patch,
+                    'games': stats['games'],
+                    'winrate': round(wr, 1),
+                    'unique_champions': len(stats['champions']),
+                    'diversity_score': round(len(stats['champions']) / stats['games'], 2) if stats['games'] > 0 else 0
+                })
+
+            # Check if player explores new champions each patch (good adaptation)
+            avg_diversity = sum(p['diversity_score'] for p in patch_data) / len(patch_data) if patch_data else 0
+            is_adapting = avg_diversity > 0.3  # Playing multiple champions per patch
+
+            return {
+                'is_adapting': is_adapting,
+                'patches_played': len(patches),
+                'patch_data': patch_data,
+                'avg_diversity_score': round(avg_diversity, 2)
+            }
+
+        except Exception as e:
+            print(f"[META ADAPTATION] ❌ Error: {str(e)}")
             import traceback
             traceback.print_exc()
             return None
