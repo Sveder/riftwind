@@ -885,20 +885,24 @@ function buildStoryCards(summonerData, reviewData) {
         cards.push(`
             <div class="story-card">
                 <h2>${tiltEmoji} Tilt Analysis</h2>
-                <h3 style="color: ${tiltColor}; font-size: 1.8rem; margin-bottom: 20px;">${tiltStatus}</h3>
+                <h3 style="color: ${tiltColor}; font-size: 1.8rem; margin-bottom: 10px;">${tiltStatus}</h3>
+                <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 20px;">Overall Win Rate: <strong style="color: #C79B3B;">${tilt.baseline_winrate}%</strong></p>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                     <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
-                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">Normal WR</p>
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">Baseline WR</p>
                         <p style="color: #3BC77B; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_normal}%</p>
+                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 3px; font-style: italic;">With momentum</p>
                     </div>
                     <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
                         <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">After 2 Losses</p>
                         <p style="color: ${tilt.wr_after_2_losses < tilt.wr_normal ? '#C73B3B' : '#3BC77B'}; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_after_2_losses}%</p>
+                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 3px;">${tilt.games_analyzed_after_2_losses} games</p>
                     </div>
                     <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
                         <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">After 3 Losses</p>
                         <p style="color: ${tilt.wr_after_3_losses < tilt.wr_normal ? '#C73B3B' : '#3BC77B'}; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_after_3_losses}%</p>
+                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 3px;">${tilt.games_analyzed_after_3_losses} games</p>
                     </div>
                 </div>
 

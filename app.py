@@ -98,7 +98,7 @@ def cached_get(url, headers_tuple):
 
 # You need to get your API key from https://developer.riotgames.com/
 RIOT_API_KEY = os.environ.get('RIOT_API_KEY', 'YOUR_API_KEY_HERE')
-RIOT_API_KEY = "RGAPI-6d3ff612-bef2-47ed-994d-85666927612c"
+RIOT_API_KEY = "RGAPI-d0a4d97c-22d6-44a1-a7d2-ccd69cc1b45e"
 
 # Regional routing values
 REGION_ROUTING = {
