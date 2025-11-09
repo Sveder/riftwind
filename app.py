@@ -181,50 +181,60 @@ Timestamp: {search_time}
         # Get regional routing
         routing_value = REGION_ROUTING.get(region, 'americas')
 
-        # Step 1: Get PUUID from Riot ID
+        # Step 1: Get PUUID from Riot ID (CACHED - 24 hours)
         account_url = f'https://{routing_value}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}'
         headers = {'X-Riot-Token': RIOT_API_KEY}
 
         print(f"[ACCOUNT API] URL: {account_url}")
-        print(f"[ACCOUNT API] Headers: {headers}")
 
-        account_response = requests.get(account_url, headers=headers, timeout=30)
-        print(f"[ACCOUNT API] Status Code: {account_response.status_code}")
-        print(f"[ACCOUNT API] Response: {account_response.text}")
+        # Try cache first (24 hour cache for account lookups - PUUIDs rarely change)
+        cache_key = get_cache_key(account_url, headers)
+        account_data = get_from_cache(cache_key)
 
-        if account_response.status_code != 200:
-            return jsonify({'error': f'Failed to find summoner: {account_response.status_code} - {account_response.text}'}), 400
+        if not account_data:
+            # Cache miss - make API call
+            print(f"[ACCOUNT API] Cache MISS - fetching from network")
+            account_response = requests.get(account_url, headers=headers, timeout=30)
+            print(f"[ACCOUNT API] Status Code: {account_response.status_code}")
 
-        account_data = account_response.json()
+            if account_response.status_code != 200:
+                print(f"[ACCOUNT API] Error Response: {account_response.text}")
+                return jsonify({'error': f'Failed to find summoner: {account_response.status_code}'}), 400
+
+            account_data = account_response.json()
+            # Save to cache with 24-hour duration
+            save_to_cache(cache_key, account_data)
+        else:
+            print(f"[ACCOUNT API] Cache HIT - using cached data")
+
         puuid = account_data['puuid']
         print(f"[ACCOUNT API] PUUID: {puuid}")
 
-        # Step 2: Get summoner info
+        # Step 2: Get summoner info (CACHED - 1 hour)
         summoner_url = f'https://{region}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}'
         print(f"[SUMMONER API] URL: {summoner_url}")
 
-        summoner_response = requests.get(summoner_url, headers=headers, timeout=30)
-        print(f"[SUMMONER API] Status Code: {summoner_response.status_code}")
-        print(f"[SUMMONER API] Response: {summoner_response.text}")
+        # Try cache first
+        summoner_data = cached_request(summoner_url, headers)
 
-        if summoner_response.status_code != 200:
-            return jsonify({'error': f'Failed to get summoner info: {summoner_response.status_code} - {summoner_response.text}'}), 400
+        if not summoner_data:
+            print(f"[SUMMONER API] Failed to get summoner info")
+            return jsonify({'error': 'Failed to get summoner info'}), 400
 
-        summoner_data = summoner_response.json()
+        print(f"[SUMMONER API] Got summoner data (level: {summoner_data.get('summonerLevel', 'N/A')})")
 
-        # Step 3: Get champion mastery
+        # Step 3: Get champion mastery (CACHED - 1 hour)
         mastery_url = f'https://{region}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/{puuid}'
         print(f"[MASTERY API] URL: {mastery_url}")
 
-        mastery_response = requests.get(mastery_url, headers=headers, timeout=30)
-        print(f"[MASTERY API] Status Code: {mastery_response.status_code}")
-        print(f"[MASTERY API] Response: {mastery_response.text[:500]}")  # First 500 chars
+        # Try cache first
+        mastery_data = cached_request(mastery_url, headers)
 
-        mastery_data = []
-        if mastery_response.status_code == 200:
-            mastery_data = mastery_response.json()
+        if not mastery_data:
+            print(f"[MASTERY API] No mastery data available")
+            mastery_data = []
         else:
-            print(f"[MASTERY API] Failed with status {mastery_response.status_code}")
+            print(f"[MASTERY API] Got {len(mastery_data)} champion masteries")
 
         # Step 4: Get match history IDs with 2025 filter
         # Calculate 2025 timestamp range (Jan 1, 2025 00:00:00 UTC to Dec 31, 2025 23:59:59 UTC)
