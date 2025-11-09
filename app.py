@@ -33,7 +33,7 @@ print("[CACHE] Flask caching initialized")
 
 # Filesystem cache configuration
 CACHE_DIR = os.path.join(os.path.dirname(__file__), 'api_cache')
-CACHE_DURATION = 3600  # 1 hour cache
+CACHE_DURATION = 31536000  # 1 year cache (365 days) - match data never changes!
 
 # Create cache directory if it doesn't exist
 if not os.path.exists(CACHE_DIR):
