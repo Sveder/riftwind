@@ -212,9 +212,55 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+
+        /* Logo Header */
+        .logo-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding: 20px 40px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 1500;
+            border-bottom: 1px solid rgba(199, 155, 59, 0.2);
+        }
+
+        .logo-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .logo-link:hover {
+            transform: translateX(5px);
+        }
+
+        .logo-img {
+            height: 40px;
+            width: auto;
+            margin-right: 15px;
+        }
+
+        .logo-text {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #C79B3B 0%, #D4AF37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
     </style>
 </head>
 <body>
+    <!-- Logo Header -->
+    <header class="logo-header">
+        <a href="/" class="logo-link">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Riftwind Logo" class="logo-img">
+            <span class="logo-text">Riftwind</span>
+        </a>
+    </header>
+
     <!-- Loading Overlay -->
     <div id="loadingOverlay">
         <div class="loading-text">⚔️ Exploring the Rift... ⚔️</div>
