@@ -895,6 +895,18 @@ function buildStoryCards(summonerData, reviewData) {
                 <p style="color: #A09B8C; margin-top: 15px; font-size: 0.9rem;">
                     Total CS: ${cs.total_cs.toLocaleString()}
                 </p>
+
+                <div style="margin-top: 20px; padding: 15px; background: rgba(59, 199, 123, 0.1); border: 2px solid #3BC77B; border-radius: 10px;">
+                    <p style="color: #3BC77B; font-size: 1rem; margin-bottom: 10px; font-weight: bold;">
+                        🎮 Improve Your Vision Skills!
+                    </p>
+                    <p style="color: #A09B8C; font-size: 0.85rem; margin-bottom: 10px;">
+                        Practice ward placement and last-hitting in our interactive mini-game.
+                    </p>
+                    <a href="/ward-game" style="display: inline-block; background: linear-gradient(135deg, #3BC77B 0%, #4CAF50 100%); color: #0A1428; padding: 10px 20px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 0.9rem;">
+                        Play Vision Game →
+                    </a>
+                </div>
             </div>
         `);
     }
