@@ -151,10 +151,10 @@ async function startReview() {
         document.getElementById('introSection').style.display = 'none';
         document.getElementById('loadingOverlay').style.display = 'flex';
 
-        console.log('[YEAR IN REVIEW] First, getting preview stats...');
+        console.log('[YEAR IN REVIEW] Generating year in review...');
 
-        // First, show preview stats
-        showPreviewStats(data);
+        // Go straight to full analysis
+        generateYearInReview(data);
     } catch (error) {
         console.error('[YEAR IN REVIEW] Error loading data from IndexedDB:', error);
         alert('Failed to load summoner data. Please search for a summoner again.');
