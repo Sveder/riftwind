@@ -43,7 +43,7 @@ const FOG_ALPHA = 0.7;
 const MINION_SPAWN_INTERVAL = 3000; // Spawn minion every 3 seconds
 const MINION_LIFETIME = 15000; // Minions last 15 seconds
 const MINION_HEALTH = 100;
-const MINION_RADIUS = 6;
+const MINION_RADIUS = 12;
 
 // Initialize game
 $(document).ready(function() {
@@ -214,7 +214,7 @@ function checkMinionClick(x, y) {
         const dy = y - minion.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist <= minion.radius + 5) { // Slight tolerance
+        if (dist <= minion.radius + 8) { // Bigger tolerance for larger minions
             return minion;
         }
     }
@@ -288,30 +288,6 @@ function drawGame() {
         ctx.fillRect(ward.x - barWidth/2, ward.y + 15, barWidth * timePercent, barHeight);
     });
 
-    // Draw minions (before fog)
-    game.minions.forEach(minion => {
-        const healthPercent = minion.health / minion.maxHealth;
-
-        // Minion body
-        ctx.fillStyle = healthPercent <= 0.3 ? '#FFD700' : '#6B8E23';
-        ctx.strokeStyle = '#2F4F2F';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(minion.x, minion.y, minion.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Health bar
-        const barWidth = 20;
-        const barHeight = 3;
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(minion.x - barWidth/2, minion.y - minion.radius - 5, barWidth, barHeight);
-
-        ctx.fillStyle = healthPercent > 0.3 ? '#4CAF50' : '#FFD700';
-        ctx.fillRect(minion.x - barWidth/2, minion.y - minion.radius - 5, barWidth * healthPercent, barHeight);
-    });
-
     // Draw fog of war
     ctx.fillStyle = `rgba(0, 0, 0, ${FOG_ALPHA})`;
     ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
@@ -330,6 +306,44 @@ function drawGame() {
         ctx.fill();
     });
     ctx.globalCompositeOperation = 'source-over';
+
+    // Draw minions (AFTER fog - so they appear above it)
+    game.minions.forEach(minion => {
+        const healthPercent = minion.health / minion.maxHealth;
+
+        // Glow effect for low health minions
+        if (healthPercent <= 0.3) {
+            ctx.shadowColor = '#FFD700';
+            ctx.shadowBlur = 15;
+        }
+
+        // Minion body - bigger and more pronounced
+        ctx.fillStyle = healthPercent <= 0.3 ? '#FFD700' : '#7CB342';
+        ctx.strokeStyle = healthPercent <= 0.3 ? '#FFA000' : '#33691E';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(minion.x, minion.y, minion.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Reset shadow
+        ctx.shadowBlur = 0;
+
+        // Health bar - bigger
+        const barWidth = 30;
+        const barHeight = 4;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(minion.x - barWidth/2, minion.y - minion.radius - 8, barWidth, barHeight);
+
+        ctx.fillStyle = healthPercent > 0.3 ? '#4CAF50' : '#FFD700';
+        ctx.fillRect(minion.x - barWidth/2, minion.y - minion.radius - 8, barWidth * healthPercent, barHeight);
+
+        // Border for health bar
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(minion.x - barWidth/2, minion.y - minion.radius - 8, barWidth, barHeight);
+    });
 
     // Draw enemy ONLY if spotted (fully hidden otherwise)
     if (game.enemy.isSpotted) {
