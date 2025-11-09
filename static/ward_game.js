@@ -10,6 +10,7 @@ const game = {
     mapImage: new Image(),
     wards: [],
     maxWards: 3,
+    minions: [],
     enemy: {
         x: 400,
         y: 400,
@@ -24,10 +25,13 @@ const game = {
         wardUptime: 0,
         spotCount: 0,
         timeElapsed: 0,
-        visionScore: 0
+        visionScore: 0,
+        minionsKilled: 0,
+        cs: 0
     },
     gameStarted: false,
-    lastUpdate: Date.now()
+    lastUpdate: Date.now(),
+    lastMinionSpawn: 0
 };
 
 // Constants
@@ -36,6 +40,10 @@ const WARD_MIN_DURATION = 10000; // 10 seconds
 const WARD_MAX_DURATION = 30000; // 30 seconds
 const MAP_SIZE = 800;
 const FOG_ALPHA = 0.7;
+const MINION_SPAWN_INTERVAL = 3000; // Spawn minion every 3 seconds
+const MINION_LIFETIME = 15000; // Minions last 15 seconds
+const MINION_HEALTH = 100;
+const MINION_RADIUS = 6;
 
 // Initialize game
 $(document).ready(function() {
@@ -60,7 +68,7 @@ $(document).ready(function() {
         startGame();
     });
 
-    // Canvas click handler for placing wards
+    // Canvas click handler for placing wards and last hitting minions
     game.canvas.addEventListener('click', function(e) {
         if (!game.gameStarted) return;
 
@@ -68,7 +76,14 @@ $(document).ready(function() {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        placeWard(x, y);
+        // Check if clicking on a minion first
+        const clickedMinion = checkMinionClick(x, y);
+        if (clickedMinion) {
+            lastHitMinion(clickedMinion);
+        } else {
+            // Otherwise place a ward
+            placeWard(x, y);
+        }
     });
 });
 
@@ -84,6 +99,9 @@ function startGame() {
     // Give enemy a new target every 3-5 seconds
     setInterval(moveEnemy, 3000);
     moveEnemy(); // Initial movement
+
+    // Spawn minions periodically
+    setInterval(spawnMinion, MINION_SPAWN_INTERVAL);
 }
 
 function updateGame() {
@@ -105,6 +123,16 @@ function updateGame() {
     game.wards = game.wards.filter(ward => {
         ward.timeRemaining -= deltaTime;
         return ward.timeRemaining > 0;
+    });
+
+    // Update minions
+    game.minions = game.minions.filter(minion => {
+        minion.timeAlive += deltaTime;
+
+        // Reduce health over time (natural decay)
+        minion.health -= deltaTime / 150; // Takes ~15 seconds to die naturally
+
+        return minion.health > 0 && minion.timeAlive < MINION_LIFETIME;
     });
 
     // Check if enemy is spotted
@@ -163,6 +191,57 @@ function moveEnemy() {
     game.enemy.targetY = margin + Math.random() * (MAP_SIZE - 2 * margin);
 }
 
+function spawnMinion() {
+    // Spawn minion at random location
+    const margin = 50;
+    const minion = {
+        x: margin + Math.random() * (MAP_SIZE - 2 * margin),
+        y: margin + Math.random() * (MAP_SIZE - 2 * margin),
+        radius: MINION_RADIUS,
+        health: MINION_HEALTH,
+        maxHealth: MINION_HEALTH,
+        timeAlive: 0
+    };
+
+    game.minions.push(minion);
+    console.log('[WARD GAME] Minion spawned at', minion.x, minion.y);
+}
+
+function checkMinionClick(x, y) {
+    // Check if click is within any minion's radius
+    for (const minion of game.minions) {
+        const dx = x - minion.x;
+        const dy = y - minion.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist <= minion.radius + 5) { // Slight tolerance
+            return minion;
+        }
+    }
+    return null;
+}
+
+function lastHitMinion(minion) {
+    // Check if minion is low enough to last hit (below 30% health)
+    const healthPercent = (minion.health / minion.maxHealth) * 100;
+
+    if (healthPercent <= 30) {
+        // Successful last hit!
+        game.stats.minionsKilled++;
+        game.stats.cs++;
+
+        // Remove minion
+        const index = game.minions.indexOf(minion);
+        if (index > -1) {
+            game.minions.splice(index, 1);
+        }
+
+        console.log('[WARD GAME] Last hit! CS:', game.stats.cs);
+    } else {
+        console.log('[WARD GAME] Too early! Minion health:', healthPercent.toFixed(1) + '%');
+    }
+}
+
 function isEnemySpotted() {
     // Check if enemy is within vision range of any ward
     for (const ward of game.wards) {
@@ -188,16 +267,13 @@ function drawGame() {
 
     // Draw wards first (under fog)
     game.wards.forEach(ward => {
-        // Ward indicator
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
-        ctx.beginPath();
-        ctx.arc(ward.x, ward.y, 12, 0, Math.PI * 2);
-        ctx.fill();
-
+        // Ward indicator (simple circle)
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.5)';
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(ward.x, ward.y, 12, 0, Math.PI * 2);
+        ctx.arc(ward.x, ward.y, 8, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
 
         // Timer bar
@@ -206,10 +282,34 @@ function drawGame() {
         const timePercent = ward.timeRemaining / ward.maxDuration;
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(ward.x - barWidth/2, ward.y + 20, barWidth, barHeight);
+        ctx.fillRect(ward.x - barWidth/2, ward.y + 15, barWidth, barHeight);
 
         ctx.fillStyle = timePercent > 0.3 ? '#FFD700' : '#FF6B6B';
-        ctx.fillRect(ward.x - barWidth/2, ward.y + 20, barWidth * timePercent, barHeight);
+        ctx.fillRect(ward.x - barWidth/2, ward.y + 15, barWidth * timePercent, barHeight);
+    });
+
+    // Draw minions (before fog)
+    game.minions.forEach(minion => {
+        const healthPercent = minion.health / minion.maxHealth;
+
+        // Minion body
+        ctx.fillStyle = healthPercent <= 0.3 ? '#FFD700' : '#6B8E23';
+        ctx.strokeStyle = '#2F4F2F';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(minion.x, minion.y, minion.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Health bar
+        const barWidth = 20;
+        const barHeight = 3;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(minion.x - barWidth/2, minion.y - minion.radius - 5, barWidth, barHeight);
+
+        ctx.fillStyle = healthPercent > 0.3 ? '#4CAF50' : '#FFD700';
+        ctx.fillRect(minion.x - barWidth/2, minion.y - minion.radius - 5, barWidth * healthPercent, barHeight);
     });
 
     // Draw fog of war
@@ -231,7 +331,7 @@ function drawGame() {
     });
     ctx.globalCompositeOperation = 'source-over';
 
-    // Draw enemy (only if spotted or for debugging)
+    // Draw enemy ONLY if spotted (fully hidden otherwise)
     if (game.enemy.isSpotted) {
         // Spotted - draw with alert
         ctx.fillStyle = '#FF4444';
@@ -250,13 +350,8 @@ function drawGame() {
         ctx.beginPath();
         ctx.arc(game.enemy.x, game.enemy.y, ringRadius, 0, Math.PI * 2);
         ctx.stroke();
-    } else {
-        // Hidden - draw faintly (for debugging)
-        ctx.fillStyle = 'rgba(100, 0, 0, 0.3)';
-        ctx.beginPath();
-        ctx.arc(game.enemy.x, game.enemy.y, game.enemy.radius, 0, Math.PI * 2);
-        ctx.fill();
     }
+    // Enemy is NOT drawn when hidden - stays behind fog of war
 }
 
 function updateUI() {
@@ -268,4 +363,16 @@ function updateUI() {
     $('#spotCount').text(game.stats.spotCount);
     $('#timeElapsed').text(game.stats.timeElapsed.toFixed(1) + 's');
     $('#visionScore').text(game.stats.visionScore);
+
+    // Update CS count
+    if ($('#csCount').length === 0) {
+        // Add CS counter if it doesn't exist
+        $('.stats-panel').append(`
+            <div class="stat-item">
+                <span class="stat-label">CS (Last Hits):</span>
+                <span id="csCount" class="stat-value">0</span>
+            </div>
+        `);
+    }
+    $('#csCount').text(game.stats.cs);
 }
