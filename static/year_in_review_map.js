@@ -16,7 +16,9 @@ const mapState = {
     keys: {},
     moveSpeed: 5,
     edgeScrollZone: 50, // pixels from edge to trigger scroll
-    edgeScrollSpeed: 10
+    edgeScrollSpeed: 10,
+    mapWidth: 3000,  // Map dimensions
+    mapHeight: 3000
 };
 
 // Card positions (will be populated with actual cards)
@@ -47,6 +49,37 @@ function setupNavigation() {
 
     const container = $('#mapContainer');
     const viewport = $('#mapViewport');
+
+    // === Mouse Drag Navigation ===
+    container.on('mousedown', function(e) {
+        mapState.isDragging = true;
+        mapState.lastMouseX = e.clientX;
+        mapState.lastMouseY = e.clientY;
+        container.css('cursor', 'grabbing');
+    });
+
+    $(document).on('mousemove', function(e) {
+        if (mapState.isDragging) {
+            const deltaX = e.clientX - mapState.lastMouseX;
+            const deltaY = e.clientY - mapState.lastMouseY;
+
+            mapState.x += deltaX;
+            mapState.y += deltaY;
+
+            mapState.lastMouseX = e.clientX;
+            mapState.lastMouseY = e.clientY;
+
+            updateViewport();
+            checkCardVisibility();
+        }
+    });
+
+    $(document).on('mouseup', function() {
+        if (mapState.isDragging) {
+            mapState.isDragging = false;
+            container.css('cursor', 'grab');
+        }
+    });
 
     // === WASD Keyboard Controls ===
     $(document).on('keydown', function(e) {
@@ -86,6 +119,9 @@ function setupNavigation() {
 
     // === Edge Scrolling ===
     container.on('mousemove', function(e) {
+        // Skip edge scrolling if dragging
+        if (mapState.isDragging) return;
+
         const rect = this.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -154,6 +190,42 @@ function setupNavigation() {
 
 function updateViewport() {
     const viewport = $('#mapViewport');
+    const container = $('#mapContainer');
+
+    // Get container dimensions
+    const containerWidth = container.width();
+    const containerHeight = container.height();
+
+    // Calculate scaled map dimensions
+    const scaledMapWidth = mapState.mapWidth * mapState.zoom;
+    const scaledMapHeight = mapState.mapHeight * mapState.zoom;
+
+    // Calculate boundaries
+    // When map is larger than container, constrain to show map edges
+    // When map is smaller than container, center it
+    let minX, maxX, minY, maxY;
+
+    if (scaledMapWidth > containerWidth) {
+        // Map is wider than container
+        minX = -(scaledMapWidth - containerWidth);
+        maxX = 0;
+    } else {
+        // Map is narrower than container - center it
+        minX = maxX = (containerWidth - scaledMapWidth) / 2;
+    }
+
+    if (scaledMapHeight > containerHeight) {
+        // Map is taller than container
+        minY = -(scaledMapHeight - containerHeight);
+        maxY = 0;
+    } else {
+        // Map is shorter than container - center it
+        minY = maxY = (containerHeight - scaledMapHeight) / 2;
+    }
+
+    // Constrain position to boundaries
+    mapState.x = Math.max(minX, Math.min(maxX, mapState.x));
+    mapState.y = Math.max(minY, Math.min(maxY, mapState.y));
 
     // Apply transform
     viewport.css({
@@ -165,7 +237,7 @@ function updateViewport() {
 function loadYearInReview() {
     console.log('[MAP] Loading year in review data...');
 
-    // Get data from window or sessionStorage
+    // Get data from window, sessionStorage, or localStorage
     let summonerData = window.currentSummonerData;
 
     if (!summonerData) {
@@ -175,6 +247,31 @@ function loadYearInReview() {
             summonerData = JSON.parse(stored);
             window.currentSummonerData = summonerData;
             console.log('[MAP] Loaded summoner data from sessionStorage');
+        }
+    }
+
+    if (!summonerData) {
+        // Try to load from localStorage (same as year_in_review.js)
+        const storedLocal = localStorage.getItem('summonerData');
+        if (storedLocal) {
+            summonerData = JSON.parse(storedLocal);
+
+            // Retrieve timelines separately
+            const timelinesData = localStorage.getItem('matchTimelines');
+            if (timelinesData) {
+                try {
+                    summonerData.matchTimelines = JSON.parse(timelinesData);
+                    console.log('[MAP] Loaded', summonerData.matchTimelines.length, 'timelines from storage');
+                } catch (e) {
+                    console.error('[MAP] Failed to parse timelines:', e);
+                    summonerData.matchTimelines = [];
+                }
+            } else {
+                summonerData.matchTimelines = [];
+            }
+
+            window.currentSummonerData = summonerData;
+            console.log('[MAP] Loaded summoner data from localStorage');
         }
     }
 

@@ -10,6 +10,7 @@ import time
 import hashlib
 import boto3
 import sentry_sdk
+from opgg_mcp_http import BedrockWithOPGG
 
 sentry_sdk.init(
     dsn="https://faf6e4c2356f87cfc145dcf4b725d0a9@o630775.ingest.us.sentry.io/4510320357212160",
@@ -685,6 +686,75 @@ def roast_player():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/roast-me-enhanced', methods=['POST'])
+def roast_player_enhanced():
+    """Generate an enhanced AI roast using OP.GG MCP data"""
+    try:
+        data = request.json
+        matches = data.get('matches', [])
+        summoner_name = data.get('summonerName', 'Summoner')
+        region = data.get('region', 'na1')
+
+        if not matches:
+            return jsonify({'error': 'No match data provided'}), 400
+
+        # Get player's most played champion
+        champion_counts = {}
+        for match in matches:
+            champ = match.get('championName', 'Unknown')
+            champion_counts[champ] = champion_counts.get(champ, 0) + 1
+
+        most_played_champ = max(champion_counts.items(), key=lambda x: x[1])[0] if champion_counts else 'Yasuo'
+
+        # Calculate basic stats
+        total_games = len(matches)
+        wins = sum(1 for m in matches if m.get('win'))
+        winrate = (wins / total_games * 100) if total_games > 0 else 0
+        avg_deaths = sum(m.get('deaths', 0) for m in matches) / total_games if total_games > 0 else 0
+        avg_kda = sum(
+            (m.get('kills', 0) + m.get('assists', 0)) / max(m.get('deaths', 1), 1)
+            for m in matches
+        ) / total_games if total_games > 0 else 0
+
+        # Determine most common position
+        position_counts = {}
+        for match in matches:
+            pos = match.get('teamPosition', 'MID')
+            position_counts[pos] = position_counts.get(pos, 0) + 1
+        most_played_position = max(position_counts.items(), key=lambda x: x[1])[0] if position_counts else 'MID'
+
+        # Prepare player stats
+        player_stats = {
+            'championName': most_played_champ,
+            'position': most_played_position,
+            'winrate': round(winrate, 1),
+            'games_played': total_games,
+            'avg_deaths': round(avg_deaths, 1),
+            'avg_kda': round(avg_kda, 2)
+        }
+
+        # Use OP.GG MCP + Bedrock
+        bedrock_opgg = BedrockWithOPGG()
+        enhanced_roast = bedrock_opgg.generate_enhanced_roast(
+            player_stats,
+            most_played_champ,
+            most_played_position
+        )
+
+        return jsonify({'roast': enhanced_roast})
+
+    except Exception as e:
+        print(f"[ENHANCED ROAST] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Fallback to regular roast
+        try:
+            analyzer = YearInReviewAnalyzer(matches, summoner_name, region)
+            roast = analyzer.generate_roast()
+            return jsonify({'roast': roast, 'fallback': True})
+        except:
+            return jsonify({'error': str(e)}), 500
 
 def save_api_logs(game_name, tag_line, region, api_data):
     """Save all API responses to a JSON file in the logs folder"""

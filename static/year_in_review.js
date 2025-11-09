@@ -664,6 +664,85 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
+    // Card 14.5: Build Comparison (OP.GG)
+    if (analysis.build_comparison && analysis.build_comparison.optimal_build) {
+        const buildData = analysis.build_comparison;
+        const optimal = buildData.optimal_build;
+        const playerItems = buildData.player_most_common_items || [];
+
+        cards.push(`
+            <div class="story-card">
+                <h2>📊 Build Check (OP.GG)</h2>
+                <h3 style="color: #C79B3B; font-size: 1.8rem; margin-bottom: 10px;">${buildData.champion} ${buildData.position}</h3>
+                <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 30px;">Based on ${buildData.games_analyzed} games analyzed</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px;">
+                    <div style="background: rgba(59, 199, 123, 0.1); border: 2px solid #3BC77B; border-radius: 15px; padding: 20px;">
+                        <h4 style="color: #3BC77B; margin-bottom: 15px;">✓ Meta Build</h4>
+                        <p style="font-size: 0.85rem; color: #A09B8C; margin-bottom: 10px;">Win Rate: ${optimal.win_rate}%</p>
+
+                        ${optimal.core_items && optimal.core_items.length > 0 ? `
+                            <div style="margin-top: 15px;">
+                                <p style="color: #E4E1D8; font-size: 0.9rem; margin-bottom: 10px;">Core Items:</p>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                    ${optimal.core_items.slice(0, 6).map(item => `
+                                        <div style="background: rgba(255, 255, 255, 0.1); padding: 5px; border-radius: 5px; text-align: center;" title="${getItemName(item)}">
+                                            <img src="${getItemImage(item)}" style="width: 40px; height: 40px; border-radius: 3px; display: block; margin: 0 auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                            <span style="display: none; font-size: 0.7rem; color: #A09B8C;">${item}</span>
+                                            <div style="font-size: 0.65rem; margin-top: 3px; color: #E4E1D8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${getItemName(item)}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${optimal.boots && optimal.boots.length > 0 ? `
+                            <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                                <p style="font-size: 0.85rem; color: #A09B8C; margin-bottom: 5px;">Boots:</p>
+                                <div style="display: inline-block; background: rgba(255, 255, 255, 0.1); padding: 5px; border-radius: 5px;">
+                                    <img src="${getItemImage(optimal.boots[0])}" style="width: 40px; height: 40px; border-radius: 3px; vertical-align: middle;" onerror="this.style.display='none';" />
+                                    <span style="font-size: 0.75rem; margin-left: 5px; vertical-align: middle;">${getItemName(optimal.boots[0])}</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div style="background: rgba(199, 59, 59, 0.1); border: 2px solid #C73B3B; border-radius: 15px; padding: 20px;">
+                        <h4 style="color: #C73B3B; margin-bottom: 15px;">✗ Your Build</h4>
+                        <p style="font-size: 0.85rem; color: #A09B8C; margin-bottom: 10px;">Most Common Items</p>
+
+                        ${playerItems.length > 0 ? `
+                            <div style="margin-top: 15px;">
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                    ${playerItems.slice(0, 6).map(item => {
+                                        const isInMeta = optimal.core_items && optimal.core_items.includes(item);
+                                        return `
+                                            <div style="background: ${isInMeta ? 'rgba(59, 199, 123, 0.2)' : 'rgba(255, 255, 255, 0.1)'}; padding: 5px; border-radius: 5px; text-align: center; border: 2px solid ${isInMeta ? '#3BC77B' : 'transparent'};" title="${getItemName(item)}">
+                                                <img src="${getItemImage(item)}" style="width: 40px; height: 40px; border-radius: 3px; display: block; margin: 0 auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                                                <span style="display: none; font-size: 0.7rem; color: #A09B8C;">${item}</span>
+                                                <div style="font-size: 0.65rem; margin-top: 3px; color: ${isInMeta ? '#3BC77B' : '#E4E1D8'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${getItemName(item)}</div>
+                                                ${isInMeta ? '<div style="font-size: 0.6rem; color: #3BC77B;">✓</div>' : ''}
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : '<p style="color: #A09B8C;">No builds recorded</p>'}
+                    </div>
+                </div>
+
+                ${buildData.meta_winrate ? `
+                    <div style="margin-top: 25px; padding: 15px; background: rgba(199, 155, 59, 0.1); border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.9rem;">
+                            ${buildData.champion} has a ${buildData.meta_winrate}% win rate in the meta.
+                            Items with <span style="color: #3BC77B; font-weight: bold;">✓</span> match the optimal build!
+                        </p>
+                    </div>
+                ` : ''}
+            </div>
+        `);
+    }
+
     // Card 15: CS Efficiency
     if (analysis.cs_efficiency) {
         const cs = analysis.cs_efficiency;

@@ -79,6 +79,9 @@ class YearInReviewAnalyzer:
         print("[ANALYZER] Analyzing kill steals...")
         kill_steals = self.analyze_kill_steals()
 
+        print("[ANALYZER] Analyzing build choices...")
+        build_comparison = self.analyze_build_mistakes()
+
         print("[ANALYZER] ✅ All analysis complete!")
 
         return {
@@ -99,7 +102,8 @@ class YearInReviewAnalyzer:
             'champion_diversity': diversity,
             'total_hours': total_hours,
             'cs_efficiency': cs_efficiency,
-            'kill_steals': kill_steals
+            'kill_steals': kill_steals,
+            'build_comparison': build_comparison
         }
 
     def find_nemesis(self):
@@ -615,6 +619,142 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
             traceback.print_exc()
             return f"Had an incredible year with {len(self.matches)} games played!"
 
+    def analyze_build_mistakes(self):
+        """Analyze player's item builds vs optimal builds using OP.GG"""
+        print("[BUILD ANALYSIS] Analyzing build orders...")
+
+        try:
+            from opgg_mcp_http import OPGGMCPHTTPClient
+
+            # Get most played champion
+            champion_counts = {}
+            position_counts = {}
+
+            for match in self.matches:
+                champ = match.get('championName', 'Unknown')
+                pos = match.get('teamPosition', 'MID')
+                champion_counts[champ] = champion_counts.get(champ, 0) + 1
+                position_counts[pos] = position_counts.get(pos, 0) + 1
+
+            if not champion_counts:
+                return None
+
+            most_played_champ = max(champion_counts.items(), key=lambda x: x[1])[0]
+            most_played_pos = max(position_counts.items(), key=lambda x: x[1])[0]
+
+            # Get OP.GG meta data
+            client = OPGGMCPHTTPClient()
+            meta_data = client.get_champion_meta(most_played_champ, most_played_pos, region="NA")
+
+            if not meta_data or 'error' in meta_data:
+                print("[BUILD ANALYSIS] Failed to get meta data")
+                return None
+
+            # Parse the JSON from the text response
+            if 'content' in meta_data and meta_data['content']:
+                text_content = meta_data['content'][0].get('text', '')
+                if text_content:
+                    parsed_data = json.loads(text_content)
+
+                    # Extract build data from the data section
+                    if 'data' in parsed_data:
+                        data = parsed_data['data']
+
+                        # Get core items from the data (first column is JSON array of item IDs)
+                        core_items = []
+                        if 'core_items' in data and 'rows' in data['core_items'] and data['core_items']['rows']:
+                            row = data['core_items']['rows'][0]
+                            if row and len(row) > 0:
+                                # First element is a JSON string like "[3153,6673,3031]"
+                                items_json = row[0]
+                                if isinstance(items_json, str):
+                                    core_items = json.loads(items_json)
+
+                        # Get boots (first column is JSON array)
+                        boots = []
+                        if 'boots' in data and 'rows' in data['boots'] and data['boots']['rows']:
+                            row = data['boots']['rows'][0]
+                            if row and len(row) > 0:
+                                boots_json = row[0]
+                                if isinstance(boots_json, str):
+                                    boots = json.loads(boots_json)
+
+                        # Get starter items (first column is JSON array)
+                        starter_items = []
+                        if 'starter_items' in data and 'rows' in data['starter_items'] and data['starter_items']['rows']:
+                            row = data['starter_items']['rows'][0]
+                            if row and len(row) > 0:
+                                starter_json = row[0]
+                                if isinstance(starter_json, str):
+                                    starter_items = json.loads(starter_json)
+
+                        # Get summary stats
+                        win_rate = None
+                        pick_rate = None
+                        if 'summary' in data and 'rows' in data['summary'] and data['summary']['rows']:
+                            summary = data['summary']['rows'][0]
+                            win_rate = summary[4] if len(summary) > 4 else None  # win_rate is index 4
+                            pick_rate = summary[5] if len(summary) > 5 else None  # pick_rate is index 5
+
+                        optimal_build = {
+                            'core_items': core_items,
+                            'boots': boots,
+                            'starter_items': starter_items,
+                            'win_rate': win_rate,
+                            'pick_rate': pick_rate
+                        }
+
+                        print(f"[BUILD ANALYSIS] Extracted build: {optimal_build}")
+                    else:
+                        print("[BUILD ANALYSIS] No data in parsed response")
+                        return None
+                else:
+                    print("[BUILD ANALYSIS] No text content")
+                    return None
+            else:
+                print("[BUILD ANALYSIS] No content in meta_data")
+                return None
+
+            # Analyze player's actual builds
+            player_builds = []
+            for match in self.matches:
+                if match.get('championName') == most_played_champ:
+                    items = []
+                    for i in range(7):  # item0-item6
+                        item = match.get(f'item{i}')
+                        if item and item != 0:
+                            items.append(item)
+                    if items:
+                        player_builds.append({
+                            'items': items,
+                            'win': match.get('win', False)
+                        })
+
+            # Calculate most common player build
+            from collections import Counter
+            item_frequencies = Counter()
+            for build in player_builds:
+                for item in build['items']:
+                    item_frequencies[item] += 1
+
+            most_common_items = [item for item, count in item_frequencies.most_common(6)]
+
+            return {
+                'champion': most_played_champ,
+                'position': most_played_pos,
+                'optimal_build': optimal_build,
+                'player_most_common_items': most_common_items,
+                'player_builds': player_builds,
+                'games_analyzed': len(player_builds),
+                'meta_winrate': optimal_build.get('win_rate')
+            }
+
+        except Exception as e:
+            print(f"[BUILD ANALYSIS] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     def generate_roast(self):
         """Generate a savage roast using AI with COMPREHENSIVE data"""
         print("[ROAST] Gathering comprehensive stats for roast...")
@@ -650,6 +790,9 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
         # Time analysis
         time_analysis = self.analyze_performance_by_time()
 
+        # NEW: Build analysis
+        build_analysis = self.analyze_build_mistakes()
+
         # Get worst performing champion
         champion_stats = {}
         for match in self.matches:
@@ -669,7 +812,18 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
                 default=None
             )
 
-        # Build comprehensive prompt
+        # Build comprehensive prompt with build analysis
+        build_roast_section = ""
+        if build_analysis:
+            build_roast_section = f"""
+Item Build Analysis (OP.GG Comparison):
+- Main Champion: {build_analysis['champion']}
+- Position: {build_analysis['position']}
+- Games analyzed: {build_analysis['games_analyzed']}
+- Optimal Build from OP.GG: {build_analysis.get('optimal_build', 'N/A')}
+- Your typical builds: Check if they match the meta!
+"""
+
         prompt = f"""You are a SAVAGE League of Legends roaster. You've been given extensive data about {self.summoner_name}'s gameplay. Pick the FUNNIEST and most BRUTAL things to roast them about. Be creative, witty, and ruthless (but playful)!
 
 📊 COMPREHENSIVE PLAYER DATA:
@@ -702,9 +856,9 @@ Missed Opportunities:
 
 Time of Day Performance:
 {f"- Best time: {time_analysis.get('best_time', 'Unknown')}" if time_analysis else ""}
-
+{build_roast_section}
 🎯 YOUR TASK:
-Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some unexpected observations. Be savage but keep it fun!"""
+Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some unexpected observations. Be savage but keep it fun! If build data is available, roast their item choices!"""
 
         try:
             print("[ROAST] Sending comprehensive data to AI...")
