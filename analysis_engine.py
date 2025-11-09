@@ -11,8 +11,7 @@ from collections import defaultdict, Counter
 MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 # AWS Bedrock Knowledge Base Configuration
-# Replace with your Knowledge Base ID from AWS Console
-KNOWLEDGE_BASE_ID = "YOUR_KNOWLEDGE_BASE_ID"  # e.g., "ABCDEF1234"
+KNOWLEDGE_BASE_ID = "P8ZJCNHXAV"
 
 
 class YearInReviewAnalyzer:

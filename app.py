@@ -669,7 +669,7 @@ Feedback:
 
 @app.route('/api/roast-me', methods=['POST'])
 def roast_player():
-    """Generate a savage AI roast"""
+    """Generate a savage AI roast using Knowledge Base"""
     try:
         data = request.json
         matches = data.get('matches', [])
@@ -679,8 +679,31 @@ def roast_player():
         if not matches:
             return jsonify({'error': 'No match data provided'}), 400
 
+        # Calculate basic stats for KB context
+        total_games = len(matches)
+        wins = sum(1 for m in matches if m.get('win'))
+        winrate = (wins / total_games * 100) if total_games > 0 else 0
+
+        # Get most played champion
+        champion_counts = {}
+        for match in matches:
+            champ = match.get('championName', 'Unknown')
+            champion_counts[champ] = champion_counts.get(champ, 0) + 1
+        most_played_champ = max(champion_counts.items(), key=lambda x: x[1])[0] if champion_counts else 'Unknown'
+
+        # Build context for KB-enhanced roast
+        player_context = f"""
+        Summoner: {summoner_name}
+        Total Games: {total_games}
+        Win Rate: {winrate:.1f}%
+        Most Played Champion: {most_played_champ}
+        Games on Main: {champion_counts.get(most_played_champ, 0)}
+        """
+
         analyzer = YearInReviewAnalyzer(matches, summoner_name, region)
-        roast = analyzer.generate_roast()
+
+        # Try KB-enhanced roast, fallback to regular if it fails
+        roast = analyzer.generate_roast_with_kb(player_context)
 
         return jsonify({'roast': roast})
 
