@@ -266,8 +266,8 @@ Timestamp: {search_time}
                     if match_response.status_code == 200:
                         match_ids_batch = match_response.json()
                     else:
-                        print(f"[MATCH API] Still failing after retry, using data collected so far")
-                        break
+                        print(f"[MATCH API] Still rate limited after retry")
+                        return jsonify({'error': 'Rate limited by Riot API. Please try again in a few minutes.'}), 429
                 else:
                     print(f"[MATCH API] Failed with status {match_response.status_code}")
                     break
@@ -303,16 +303,16 @@ Timestamp: {search_time}
                     match_data = detail_response.json()
                     print(f"[MATCH DETAILS] Successfully fetched match {match_id}")
                 elif detail_response.status_code == 429:
-                    print(f"[MATCH DETAILS] Rate limited (429) on match {match_id}, sleeping for 1 second...")
-                    time.sleep(1)
+                    print(f"[MATCH DETAILS] Rate limited (429) on match {match_id}, sleeping for 2 seconds...")
+                    time.sleep(2)
                     # Retry once after rate limit
                     detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
                     if detail_response.status_code == 200:
                         match_data = detail_response.json()
                         print(f"[MATCH DETAILS] Successfully fetched match {match_id} after retry")
                     else:
-                        print(f"[MATCH DETAILS] Still rate limited, skipping match {match_id}")
-                        continue
+                        print(f"[MATCH DETAILS] Still rate limited after retry")
+                        return jsonify({'error': 'Rate limited by Riot API. Please try again in a few minutes.'}), 429
                 else:
                     print(f"[MATCH DETAILS] Failed to fetch match {match_id}: {detail_response.status_code}")
                     continue
@@ -333,14 +333,31 @@ Timestamp: {search_time}
             # Try cache first
             timeline_data = cached_request(timeline_url, headers)
 
+            # If not in cache, fetch from API with retry logic
+            if not timeline_data:
+                timeline_response = requests.get(timeline_url, headers=headers, timeout=30)
+                if timeline_response.status_code == 200:
+                    timeline_data = timeline_response.json()
+                    print(f"[TIMELINE] Fetched timeline {i+1}/{timeline_fetch_limit}: {match_id}")
+                elif timeline_response.status_code == 429:
+                    print(f"[TIMELINE] Rate limited (429) on timeline {match_id}, sleeping for 2 seconds...")
+                    time.sleep(2)
+                    # Retry once after rate limit
+                    timeline_response = requests.get(timeline_url, headers=headers, timeout=30)
+                    if timeline_response.status_code == 200:
+                        timeline_data = timeline_response.json()
+                        print(f"[TIMELINE] Successfully fetched timeline {match_id} after retry")
+                    else:
+                        print(f"[TIMELINE] Still rate limited after retry")
+                        return jsonify({'error': 'Rate limited by Riot API. Please try again in a few minutes.'}), 429
+                else:
+                    print(f"[TIMELINE] Failed to fetch timeline for {match_id}: {timeline_response.status_code}")
+
             if timeline_data:
                 match_timelines.append({
                     'match_id': match_id,
                     'timeline': timeline_data
                 })
-                print(f"[TIMELINE] Fetched timeline {i+1}/{timeline_fetch_limit}: {match_id}")
-            else:
-                print(f"[TIMELINE] Failed to fetch timeline for {match_id}")
 
         print(f"[TIMELINE] Successfully fetched {len(match_timelines)} timelines")
 
