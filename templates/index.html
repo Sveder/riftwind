@@ -121,8 +121,18 @@
             border: 2px solid #C73B3B;
             color: #E4E1D8;
         }
-        .spinner-border {
-            color: #C79B3B !important;
+        .loading-spinner {
+            width: 240px;
+            height: 240px;
+            background-image: url("{{ url_for('static', filename='morgana-loading.gif') }}");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            border: none !important;
+            /* Key out white background for transparency */
+            mix-blend-mode: screen;
+            filter: contrast(1.2) brightness(1.1);
+            margin: 0 auto;
         }
         .text-muted {
             color: #A09B8C !important;
@@ -181,15 +191,9 @@
 
                 <form id="summonerForm">
                     <div class="mb-3">
-                        <label for="gameName" class="form-label">Riot ID (Game Name)</label>
-                        <input type="text" class="form-control" id="gameName" placeholder="e.g., PlayerName" required>
-                        <small class="form-text text-muted">Enter your Riot ID without the tag</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="tagLine" class="form-label">Tag Line</label>
-                        <input type="text" class="form-control" id="tagLine" placeholder="e.g., NA1" required>
-                        <small class="form-text text-muted">Enter your tag line (the part after #)</small>
+                        <label for="riotId" class="form-label">Riot ID</label>
+                        <input type="text" class="form-control" id="riotId" placeholder="GameName#Tag" required>
+                        <small class="form-text text-muted">Enter your Riot ID in format: GameName#Tag (e.g., Jankos#EUW)</small>
                     </div>
 
                     <div class="mb-3">
@@ -227,7 +231,7 @@
                 </form>
 
                 <div class="loading text-center mt-4">
-                    <div class="spinner-border text-primary" role="status">
+                    <div class="loading-spinner" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
                     <p class="mt-2" style="color: #C79B3B;">Fetching summoner data and match history...</p>

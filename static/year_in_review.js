@@ -1,6 +1,48 @@
 let reviewData = null;
 let currentCard = 0;
 
+// IndexedDB helper functions
+const dbName = 'RiftwindDB';
+const storeName = 'summonerData';
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName, { keyPath: 'id' });
+            }
+        };
+    });
+}
+
+function getFromIndexedDB(key) {
+    return new Promise((resolve, reject) => {
+        openDB().then(db => {
+            const transaction = db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
+            request.onsuccess = () => resolve(request.result ? request.result.data : null);
+            request.onerror = () => reject(request.error);
+        }).catch(reject);
+    });
+}
+
+function saveToIndexedDB(key, data) {
+    return new Promise((resolve, reject) => {
+        openDB().then(db => {
+            const transaction = db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put({ id: key, data: data, timestamp: Date.now() });
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        }).catch(reject);
+    });
+}
+
 // Configure marked library for inline rendering
 if (typeof marked !== 'undefined') {
     marked.setOptions({
@@ -39,46 +81,85 @@ function createParticles() {
 }
 
 // Start the review experience
-function startReview() {
+async function startReview() {
     console.log('[YEAR IN REVIEW] Starting review experience...');
 
-    // Get summoner data from previous page (passed via URL params or localStorage)
-    const urlParams = new URLSearchParams(window.location.search);
-    const summonerData = localStorage.getItem('summonerData');
+    try {
+        // Check if we have URL parameters (shared link)
+        const urlParams = new URLSearchParams(window.location.search);
+        const summonerParam = urlParams.get('summoner');
+        const regionParam = urlParams.get('region');
 
-    if (!summonerData) {
-        console.error('[YEAR IN REVIEW] No summoner data found!');
-        alert('Please search for a summoner first!');
-        window.location.href = '/';
-        return;
-    }
+        let data = await getFromIndexedDB('summonerData');
 
-    const data = JSON.parse(summonerData);
+        // If URL has summoner info and it doesn't match cached data, fetch it
+        if (summonerParam && regionParam) {
+            if (!data || data.summoner.name !== summonerParam || data.region !== regionParam) {
+                console.log('[YEAR IN REVIEW] Loading data from URL parameters:', summonerParam, regionParam);
 
-    // Retrieve timelines separately
-    const timelinesData = localStorage.getItem('matchTimelines');
-    if (timelinesData) {
-        try {
-            data.matchTimelines = JSON.parse(timelinesData);
-            console.log('[YEAR IN REVIEW] Loaded', data.matchTimelines.length, 'timelines from storage');
-        } catch (e) {
-            console.error('[YEAR IN REVIEW] Failed to parse timelines:', e);
+                // Show loading immediately
+                document.getElementById('introSection').style.display = 'none';
+                document.getElementById('loadingOverlay').style.display = 'flex';
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div class="spinner"></div>
+                    <p style="margin-top: 20px;">Loading ${summonerParam}'s data...</p>
+                `;
+
+                // Fetch data from API
+                try {
+                    const response = await $.ajax({
+                        url: '/api/summoner',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            gameName: summonerParam.split('#')[0],
+                            tagLine: summonerParam.split('#')[1] || regionParam,
+                            region: regionParam
+                        })
+                    });
+
+                    // Save to IndexedDB for future use
+                    response.region = regionParam;
+                    await saveToIndexedDB('summonerData', response);
+                    data = response;
+                    console.log('[YEAR IN REVIEW] Data fetched and saved from API');
+                } catch (error) {
+                    console.error('[YEAR IN REVIEW] Failed to fetch summoner data:', error);
+                    alert('Failed to load summoner data. Please try again.');
+                    window.location.href = '/';
+                    return;
+                }
+            }
+        }
+
+        if (!data) {
+            console.error('[YEAR IN REVIEW] No summoner data found in IndexedDB!');
+            alert('Please search for a summoner first!');
+            window.location.href = '/';
+            return;
+        }
+
+        // Data already includes timelines if they were saved
+        if (!data.matchTimelines) {
             data.matchTimelines = [];
         }
-    } else {
-        data.matchTimelines = [];
+        console.log('[YEAR IN REVIEW] Summoner data loaded:', data.summoner.name);
+        console.log('[YEAR IN REVIEW] Total matches to analyze:', data.recentMatches.length);
+        console.log('[YEAR IN REVIEW] Timelines available:', data.matchTimelines.length);
+
+        // Hide intro, show loading
+        document.getElementById('introSection').style.display = 'none';
+        document.getElementById('loadingOverlay').style.display = 'flex';
+
+        console.log('[YEAR IN REVIEW] First, getting preview stats...');
+
+        // First, show preview stats
+        showPreviewStats(data);
+    } catch (error) {
+        console.error('[YEAR IN REVIEW] Error loading data from IndexedDB:', error);
+        alert('Failed to load summoner data. Please search for a summoner again.');
+        window.location.href = '/';
     }
-    console.log('[YEAR IN REVIEW] Summoner data loaded:', data.summoner.name);
-    console.log('[YEAR IN REVIEW] Total matches to analyze:', data.recentMatches.length);
-
-    // Hide intro, show loading
-    document.getElementById('introSection').style.display = 'none';
-    document.getElementById('loadingOverlay').style.display = 'flex';
-
-    console.log('[YEAR IN REVIEW] First, getting preview stats...');
-
-    // First, show preview stats
-    showPreviewStats(data);
 }
 
 // Show preview stats before full analysis
@@ -878,14 +959,46 @@ function buildStoryCards(summonerData, reviewData) {
     // Card 17: Tilt Detection
     if (analysis.tilt_detection) {
         const tilt = analysis.tilt_detection;
-        const tiltColor = tilt.is_tilting ? '#C73B3B' : '#3BC77B';
-        const tiltEmoji = tilt.is_tilting ? '🔥' : '🧘';
-        const tiltStatus = tilt.is_tilting ? 'Tilt Detected' : 'Mental Fortress';
+
+        // Determine status message and styling based on tilt_status
+        let tiltColor, tiltEmoji, tiltStatusText, tiltMessage;
+
+        switch(tilt.tilt_status) {
+            case 'heavily_tilting':
+                tiltColor = '#8B0000'; // Dark red
+                tiltEmoji = '💀';
+                tiltStatusText = 'Heavily Tilting';
+                tiltMessage = `With a ${tilt.baseline_winrate}% win rate, you're in a serious slump. Time to take a break and reset!`;
+                break;
+            case 'tilting':
+                tiltColor = '#C73B3B'; // Red
+                tiltEmoji = '🔥';
+                tiltStatusText = 'Tilt Detected';
+                tiltMessage = `Your performance drops significantly after losses. Consider taking breaks to maintain your edge.`;
+                break;
+            case 'tilt_prone':
+                tiltColor = '#D4AF37'; // Gold/Warning
+                tiltEmoji = '⚠️';
+                tiltStatusText = 'Tilt Prone';
+                tiltMessage = `You've had ${tilt.tilt_episodes} tilt episodes. Watch for signs of frustration and take breaks when needed.`;
+                break;
+            case 'struggling':
+                tiltColor = '#FFA500'; // Orange
+                tiltEmoji = '😰';
+                tiltStatusText = 'Struggling';
+                tiltMessage = `${tilt.baseline_winrate}% win rate suggests you're having a rough patch. Don't worry, everyone has off periods!`;
+                break;
+            default: // tilt_proof
+                tiltColor = '#3BC77B'; // Green
+                tiltEmoji = '🧘';
+                tiltStatusText = 'Mental Fortress';
+                tiltMessage = 'You maintain composure after losses - keep it up!';
+        }
 
         cards.push(`
             <div class="story-card">
                 <h2>${tiltEmoji} Tilt Analysis</h2>
-                <h3 style="color: ${tiltColor}; font-size: 1.8rem; margin-bottom: 10px;">${tiltStatus}</h3>
+                <h3 style="color: ${tiltColor}; font-size: 1.8rem; margin-bottom: 10px;">${tiltStatusText}</h3>
                 <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 20px;">Overall Win Rate: <strong style="color: #C79B3B;">${tilt.baseline_winrate}%</strong></p>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
@@ -906,28 +1019,19 @@ function buildStoryCards(summonerData, reviewData) {
                     </div>
                 </div>
 
-                ${tilt.is_tilting ? `
-                    <div style="margin-top: 20px; padding: 15px; background: rgba(199, 59, 59, 0.1); border-radius: 10px; border-left: 3px solid #C73B3B;">
-                        <p style="color: #C73B3B; font-size: 1.1rem; margin: 5px 0; font-weight: bold;">
-                            Warning: Tilt Pattern Detected
-                        </p>
-                        <p style="color: #A09B8C; font-size: 0.95rem; margin: 10px 0;">
-                            Your win rate drops ${tilt.tilt_drop_2_losses}% after losing 2 games in a row
-                        </p>
+                <div style="margin-top: 20px; padding: 15px; background: ${tilt.is_tilting || tilt.is_heavily_tilting ? 'rgba(199, 59, 59, 0.1)' : 'rgba(59, 199, 123, 0.1)'}; border-radius: 10px; border-left: 3px solid ${tiltColor};">
+                    <p style="color: ${tiltColor}; font-size: 1.1rem; margin: 5px 0; font-weight: bold;">
+                        ${tilt.is_heavily_tilting ? '⚠️ Critical Status' : tilt.is_tilting ? '⚠️ Warning' : '✨ Status'}
+                    </p>
+                    <p style="color: #A09B8C; font-size: 0.95rem; margin: 10px 0;">
+                        ${tiltMessage}
+                    </p>
+                    ${tilt.tilt_drop_2_losses >= 10 ? `
                         <p style="color: #A09B8C; font-size: 0.85rem; margin: 5px 0; font-style: italic;">
-                            Consider taking a break after back-to-back losses!
+                            💡 Tip: Your win rate drops ${tilt.tilt_drop_2_losses}% after losing 2 games in a row. Take breaks!
                         </p>
-                    </div>
-                ` : `
-                    <div style="margin-top: 20px; padding: 15px; background: rgba(59, 199, 123, 0.1); border-radius: 10px; border-left: 3px solid #3BC77B;">
-                        <p style="color: #3BC77B; font-size: 1.1rem; margin: 5px 0; font-weight: bold;">
-                            Mental Resilience
-                        </p>
-                        <p style="color: #A09B8C; font-size: 0.95rem; margin: 10px 0;">
-                            You maintain composure after losses - keep it up!
-                        </p>
-                    </div>
-                `}
+                    ` : ''}
+                </div>
 
                 <div style="margin-top: 15px; display: flex; justify-content: space-between;">
                     <div style="text-align: center;">
@@ -1222,9 +1326,14 @@ function updateProgressBar() {
 }
 
 // Get roasted by AI
-function getRoasted() {
+async function getRoasted() {
     console.log('[ROAST] Getting roasted by AI...');
-    const summonerData = JSON.parse(localStorage.getItem('summonerData'));
+    const summonerData = await getFromIndexedDB('summonerData');
+
+    if (!summonerData) {
+        console.error('[ROAST] No summoner data found');
+        return;
+    }
 
     document.getElementById('roastText').innerHTML = '<div class="spinner" style="width: 40px; height: 40px; border-width: 4px;"></div>';
     document.getElementById('roastText').style.display = 'block';
@@ -1272,8 +1381,8 @@ function getRoasted() {
 }
 
 // Social sharing functions
-function shareToTwitter() {
-    const summonerData = JSON.parse(localStorage.getItem('summonerData'));
+async function shareToTwitter() {
+    const summonerData = await getFromIndexedDB('summonerData');
     const summonerName = summonerData?.summoner?.name || 'My';
     const text = `Check out ${summonerName} League of Legends 2025 Year in Review! 🎮✨`;
     const url = window.location.href;
@@ -1287,8 +1396,8 @@ function shareToFacebook() {
     window.open(facebookUrl, '_blank', 'width=600,height=400');
 }
 
-function shareToBluesky() {
-    const summonerData = JSON.parse(localStorage.getItem('summonerData'));
+async function shareToBluesky() {
+    const summonerData = await getFromIndexedDB('summonerData');
     const summonerName = summonerData?.summoner?.name || 'My';
     const text = `Check out ${summonerName} League of Legends 2025 Year in Review! 🎮✨`;
     const url = window.location.href;
@@ -1297,7 +1406,7 @@ function shareToBluesky() {
 }
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('[INIT] Page loaded, initializing year-in-review...');
     console.log('[INIT] Current path:', window.location.pathname);
 
@@ -1305,13 +1414,17 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('[INIT] Particles created');
 
     // Check if we have summoner data
-    const summonerData = localStorage.getItem('summonerData');
-    if (!summonerData && window.location.pathname !== '/') {
-        console.warn('[INIT] No summoner data found, redirecting to home...');
-        // Redirect to home if no data
-        window.location.href = '/';
-    } else {
-        console.log('[INIT] ✅ Initialization complete. Ready to start review!');
+    try {
+        const summonerData = await getFromIndexedDB('summonerData');
+        if (!summonerData && window.location.pathname !== '/') {
+            console.warn('[INIT] No summoner data found, redirecting to home...');
+            // Redirect to home if no data
+            window.location.href = '/';
+        } else {
+            console.log('[INIT] ✅ Initialization complete. Ready to start review!');
+        }
+    } catch (error) {
+        console.error('[INIT] Error checking for summoner data:', error);
     }
 
     // Add click handler to start button

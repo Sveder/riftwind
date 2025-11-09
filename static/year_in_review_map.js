@@ -3,6 +3,48 @@
  * Navigate through Summoner's Rift to explore your stats
  */
 
+// IndexedDB helper functions
+const dbName = 'RiftwindDB';
+const storeName = 'summonerData';
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName, { keyPath: 'id' });
+            }
+        };
+    });
+}
+
+function getFromIndexedDB(key) {
+    return new Promise((resolve, reject) => {
+        openDB().then(db => {
+            const transaction = db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
+            request.onsuccess = () => resolve(request.result ? request.result.data : null);
+            request.onerror = () => reject(request.error);
+        }).catch(reject);
+    });
+}
+
+function saveToIndexedDB(key, data) {
+    return new Promise((resolve, reject) => {
+        openDB().then(db => {
+            const transaction = db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put({ id: key, data: data, timestamp: Date.now() });
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        }).catch(reject);
+    });
+}
+
 // Map State
 const mapState = {
     x: -1200, // Start centered
@@ -234,44 +276,64 @@ function updateViewport() {
     });
 }
 
-function loadYearInReview() {
+async function loadYearInReview() {
     console.log('[MAP] Loading year in review data...');
 
-    // Get data from window, sessionStorage, or localStorage
+    // Check if we have URL parameters (shared link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const summonerParam = urlParams.get('summoner');
+    const regionParam = urlParams.get('region');
+
     let summonerData = window.currentSummonerData;
 
     if (!summonerData) {
-        // Try to load from sessionStorage
-        const stored = sessionStorage.getItem('currentSummonerData');
-        if (stored) {
-            summonerData = JSON.parse(stored);
-            window.currentSummonerData = summonerData;
-            console.log('[MAP] Loaded summoner data from sessionStorage');
-        }
-    }
+        try {
+            // Load from IndexedDB
+            summonerData = await getFromIndexedDB('summonerData');
 
-    if (!summonerData) {
-        // Try to load from localStorage (same as year_in_review.js)
-        const storedLocal = localStorage.getItem('summonerData');
-        if (storedLocal) {
-            summonerData = JSON.parse(storedLocal);
+            // If URL has summoner info and it doesn't match cached data, fetch it
+            if (summonerParam && regionParam && (!summonerData || summonerData.summoner.name !== summonerParam || summonerData.region !== regionParam)) {
+                console.log('[MAP] Loading data from URL parameters:', summonerParam, regionParam);
 
-            // Retrieve timelines separately
-            const timelinesData = localStorage.getItem('matchTimelines');
-            if (timelinesData) {
+                // Show loading message
+                $('#loadingOverlay').show().html(`
+                    <div class="spinner"></div>
+                    <p style="margin-top: 20px;">Loading ${summonerParam}'s data...</p>
+                `);
+
+                // Fetch data from API
                 try {
-                    summonerData.matchTimelines = JSON.parse(timelinesData);
-                    console.log('[MAP] Loaded', summonerData.matchTimelines.length, 'timelines from storage');
-                } catch (e) {
-                    console.error('[MAP] Failed to parse timelines:', e);
-                    summonerData.matchTimelines = [];
+                    const response = await $.ajax({
+                        url: '/api/summoner',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            gameName: summonerParam.split('#')[0],
+                            tagLine: summonerParam.split('#')[1] || regionParam,
+                            region: regionParam
+                        })
+                    });
+
+                    // Save to IndexedDB for future use
+                    response.region = regionParam;
+                    await saveToIndexedDB('summonerData', response);
+                    summonerData = response;
+                    console.log('[MAP] Data fetched and saved from API');
+                } catch (error) {
+                    console.error('[MAP] Failed to fetch summoner data:', error);
+                    alert('Failed to load summoner data. Please try again.');
+                    window.location.href = '/';
+                    return;
                 }
-            } else {
-                summonerData.matchTimelines = [];
             }
 
-            window.currentSummonerData = summonerData;
-            console.log('[MAP] Loaded summoner data from localStorage');
+            if (summonerData) {
+                window.currentSummonerData = summonerData;
+                console.log('[MAP] Loaded summoner data from IndexedDB');
+                console.log('[MAP] Timelines available:', summonerData.matchTimelines?.length || 0);
+            }
+        } catch (error) {
+            console.error('[MAP] Error loading from IndexedDB:', error);
         }
     }
 

@@ -835,12 +835,43 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
             # Detect significant tilt
             tilt_drop_2_losses = wr_normal - wr_after_2_losses
             tilt_drop_3_losses = wr_normal - wr_after_3_losses
-            is_tilting = tilt_drop_2_losses >= 15 or tilt_drop_3_losses >= 20
 
+            # Improved tilt detection:
+            # 1. Check if overall win rate is very low (hard stuck/tilted)
+            # 2. Check if performance drops significantly after losses
+            # 3. Check for multiple tilt episodes
             longest_loss_streak = max([ep['length'] for ep in tilt_episodes], default=0)
+
+            # Determine tilt status with multiple criteria
+            is_heavily_tilting = False
+            is_tilting = False
+            tilt_status = "tilt_proof"
+
+            # Very low overall win rate = heavily tilting/struggling
+            if baseline_winrate < 0.35:
+                is_heavily_tilting = True
+                tilt_status = "heavily_tilting"
+            # Significant performance drop after losses
+            elif tilt_drop_2_losses >= 15 or tilt_drop_3_losses >= 20:
+                is_tilting = True
+                tilt_status = "tilting"
+            # Long loss streaks = tilting
+            elif longest_loss_streak >= 5:
+                is_tilting = True
+                tilt_status = "tilting"
+            # Multiple tilt episodes = prone to tilting
+            elif len(tilt_episodes) >= 3:
+                is_tilting = True
+                tilt_status = "tilt_prone"
+            # Low win rate but not terrible
+            elif baseline_winrate < 0.45:
+                is_tilting = True
+                tilt_status = "struggling"
 
             return {
                 'is_tilting': is_tilting,
+                'is_heavily_tilting': is_heavily_tilting,
+                'tilt_status': tilt_status,
                 'baseline_winrate': round(baseline_winrate * 100, 1),
                 'wr_after_2_losses': round(wr_after_2_losses, 1),
                 'wr_after_3_losses': round(wr_after_3_losses, 1),
