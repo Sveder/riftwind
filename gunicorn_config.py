@@ -10,7 +10,7 @@ backlog = 2048
 workers = 4
 worker_class = "sync"
 worker_connections = 1000
-timeout = 120  # Longer timeout for API calls to Riot
+timeout = 600  # 10 minutes timeout for fetching all matches and timelines
 keepalive = 2
 
 # Logging

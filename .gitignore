@@ -40,3 +40,6 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# API Cache
+api_cache/

@@ -1,6 +1,6 @@
 """
 Analysis Engine for League of Legends Year-in-Review
-Powered by AWS Bedrock (Claude Haiku 4.5)
+Powered by AWS Bedrock (Claude Sonnet 4.5)
 """
 import boto3
 import json
@@ -8,7 +8,10 @@ from datetime import datetime
 from collections import defaultdict, Counter
 
 # AWS Bedrock Configuration
-MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+MODEL_ID = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+# AWS Bedrock Knowledge Base Configuration
+KNOWLEDGE_BASE_ID = "P8ZJCNHXAV"
 
 
 class YearInReviewAnalyzer:
@@ -20,6 +23,7 @@ class YearInReviewAnalyzer:
         self.region = region
         self.timelines = timelines or []
         self.bedrock_client = boto3.client('bedrock-runtime', region_name='eu-central-1')
+        self.bedrock_agent_client = boto3.client('bedrock-agent-runtime', region_name='eu-central-1')
 
     def analyze_all(self):
         """Run all analysis and generate comprehensive year-in-review"""
@@ -79,6 +83,36 @@ class YearInReviewAnalyzer:
         print("[ANALYZER] Analyzing kill steals...")
         kill_steals = self.analyze_kill_steals()
 
+        print("[ANALYZER] Analyzing build choices...")
+        build_comparison = self.analyze_build_mistakes()
+
+        print("[ANALYZER] Detecting tilt patterns...")
+        tilt_detection = self.detect_tilt_patterns()
+
+        print("[ANALYZER] Analyzing champion fatigue...")
+        champion_fatigue = self.detect_champion_fatigue()
+
+        print("[ANALYZER] Analyzing learning curves...")
+        learning_curves = self.analyze_learning_curves()
+
+        print("[ANALYZER] Analyzing meta adaptation...")
+        meta_adaptation = self.analyze_meta_adaptation()
+
+        print("[ANALYZER] Analyzing comeback potential...")
+        comeback_potential = self.analyze_comeback_potential()
+
+        print("[ANALYZER] Analyzing power spikes...")
+        power_spikes = self.analyze_power_spikes()
+
+        print("[ANALYZER] Analyzing objective priority...")
+        objective_priority = self.analyze_objective_priority()
+
+        print("[ANALYZER] Analyzing duo synergy...")
+        duo_synergy = self.analyze_duo_synergy()
+
+        print("[ANALYZER] Analyzing tilt factor...")
+        tilt_factor = self.analyze_tilt_factor()
+
         print("[ANALYZER] ✅ All analysis complete!")
 
         return {
@@ -99,7 +133,17 @@ class YearInReviewAnalyzer:
             'champion_diversity': diversity,
             'total_hours': total_hours,
             'cs_efficiency': cs_efficiency,
-            'kill_steals': kill_steals
+            'kill_steals': kill_steals,
+            'build_comparison': build_comparison,
+            'tilt_detection': tilt_detection,
+            'champion_fatigue': champion_fatigue,
+            'learning_curves': learning_curves,
+            'meta_adaptation': meta_adaptation,
+            'comeback_potential': comeback_potential,
+            'power_spikes': power_spikes,
+            'objective_priority': objective_priority,
+            'duo_synergy': duo_synergy,
+            'tilt_factor': tilt_factor
         }
 
     def find_nemesis(self):
@@ -141,11 +185,21 @@ class YearInReviewAnalyzer:
         if not teammate_stats:
             return None
 
-        # Find teammate with most games AND high winrate
-        best_duo = max(
-            teammate_stats.items(),
-            key=lambda x: (x[1]['games'], x[1]['wins'] / x[1]['games'] if x[1]['games'] > 0 else 0)
-        )
+        # Separate teammates into those with 5+ games and those with fewer
+        frequent_teammates = {k: v for k, v in teammate_stats.items() if v['games'] >= 5}
+
+        if frequent_teammates:
+            # If we have teammates with 5+ games, pick by highest win rate
+            best_duo = max(
+                frequent_teammates.items(),
+                key=lambda x: x[1]['wins'] / x[1]['games'] if x[1]['games'] > 0 else 0
+            )
+        else:
+            # Otherwise pick by most games played
+            best_duo = max(
+                teammate_stats.items(),
+                key=lambda x: x[1]['games']
+            )
 
         return {
             'name': best_duo[0],
@@ -367,7 +421,8 @@ class YearInReviewAnalyzer:
             role = match.get('individualPosition', 'NONE')
             role_by_month[month_key][role] += 1
 
-        return dict(role_by_month)
+        # Convert Counter objects to regular dicts for JSON serialization
+        return {month: dict(roles) for month, roles in role_by_month.items()}
 
     def find_longest_win_streak(self):
         """Find longest winning streak"""
@@ -576,16 +631,14 @@ class YearInReviewAnalyzer:
 
         prompt = f"""You are a League of Legends analyst creating a fun year-in-review for {self.summoner_name}.
 
-Based on these stats, write a short, engaging narrative (3-4 sentences) about their year:
+Based on these stats, write an engaging narrative (6-8 sentences) about their year:
 
 Total Games: {len(self.matches)}
 Win Rate: {sum(1 for m in self.matches if m['win']) / len(self.matches) * 100:.1f}%
-Nemesis: {analysis_data.get('nemesis', {}).get('name', 'None')}
-BFF: {analysis_data.get('bff', {}).get('name', 'None')}
 Hot Streak Month: {analysis_data.get('hot_streak_month', {}).get('month', 'Unknown')}
 Pentakills: {analysis_data.get('highlight_stats', {}).get('total_pentakills', 0)}
 
-Make it fun, personal, and celebratory! Use emojis sparingly."""
+Make it fun, personal, and celebratory! Do not use emojis."""
 
         try:
             print("[AI NARRATIVE] Calling AWS Bedrock...")
@@ -593,7 +646,7 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
                 modelId=MODEL_ID,
                 body=json.dumps({
                     "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 300,
+                    "max_tokens": 600,
                     "messages": [
                         {
                             "role": "user",
@@ -614,6 +667,558 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
             import traceback
             traceback.print_exc()
             return f"Had an incredible year with {len(self.matches)} games played!"
+
+    def analyze_build_mistakes(self):
+        """Analyze player's item builds vs optimal builds using OP.GG"""
+        print("[BUILD ANALYSIS] Analyzing build orders...")
+
+        try:
+            from opgg_mcp_http import OPGGMCPHTTPClient
+
+            # Get most played champion
+            champion_counts = {}
+            position_counts = {}
+
+            for match in self.matches:
+                champ = match.get('championName', 'Unknown')
+                pos = match.get('teamPosition', 'MID')
+                champion_counts[champ] = champion_counts.get(champ, 0) + 1
+                position_counts[pos] = position_counts.get(pos, 0) + 1
+
+            if not champion_counts:
+                return None
+
+            most_played_champ = max(champion_counts.items(), key=lambda x: x[1])[0]
+            most_played_pos = max(position_counts.items(), key=lambda x: x[1])[0]
+
+            # Get OP.GG meta data
+            client = OPGGMCPHTTPClient()
+            meta_data = client.get_champion_meta(most_played_champ, most_played_pos, region="NA")
+
+            if not meta_data or 'error' in meta_data:
+                print("[BUILD ANALYSIS] Failed to get meta data")
+                return None
+
+            # Parse the JSON from the text response
+            if 'content' in meta_data and meta_data['content']:
+                text_content = meta_data['content'][0].get('text', '')
+                if text_content:
+                    parsed_data = json.loads(text_content)
+
+                    # Extract build data from the data section
+                    if 'data' in parsed_data:
+                        data = parsed_data['data']
+
+                        # Get core items from the data (first column is JSON array of item IDs)
+                        core_items = []
+                        if 'core_items' in data and 'rows' in data['core_items'] and data['core_items']['rows']:
+                            row = data['core_items']['rows'][0]
+                            if row and len(row) > 0:
+                                # First element is a JSON string like "[3153,6673,3031]"
+                                items_json = row[0]
+                                if isinstance(items_json, str):
+                                    core_items = json.loads(items_json)
+
+                        # Get boots (first column is JSON array)
+                        boots = []
+                        if 'boots' in data and 'rows' in data['boots'] and data['boots']['rows']:
+                            row = data['boots']['rows'][0]
+                            if row and len(row) > 0:
+                                boots_json = row[0]
+                                if isinstance(boots_json, str):
+                                    boots = json.loads(boots_json)
+
+                        # Get starter items (first column is JSON array)
+                        starter_items = []
+                        if 'starter_items' in data and 'rows' in data['starter_items'] and data['starter_items']['rows']:
+                            row = data['starter_items']['rows'][0]
+                            if row and len(row) > 0:
+                                starter_json = row[0]
+                                if isinstance(starter_json, str):
+                                    starter_items = json.loads(starter_json)
+
+                        # Get summary stats
+                        win_rate = None
+                        pick_rate = None
+                        if 'summary' in data and 'rows' in data['summary'] and data['summary']['rows']:
+                            summary = data['summary']['rows'][0]
+                            win_rate = summary[4] if len(summary) > 4 else None  # win_rate is index 4
+                            pick_rate = summary[5] if len(summary) > 5 else None  # pick_rate is index 5
+
+                        optimal_build = {
+                            'core_items': core_items,
+                            'boots': boots,
+                            'starter_items': starter_items,
+                            'win_rate': win_rate,
+                            'pick_rate': pick_rate
+                        }
+
+                        print(f"[BUILD ANALYSIS] Extracted build: {optimal_build}")
+                    else:
+                        print("[BUILD ANALYSIS] No data in parsed response")
+                        return None
+                else:
+                    print("[BUILD ANALYSIS] No text content")
+                    return None
+            else:
+                print("[BUILD ANALYSIS] No content in meta_data")
+                return None
+
+            # Analyze player's actual builds
+            player_builds = []
+            for match in self.matches:
+                if match.get('championName') == most_played_champ:
+                    items = []
+                    for i in range(7):  # item0-item6
+                        item = match.get(f'item{i}')
+                        if item and item != 0:
+                            items.append(item)
+                    if items:
+                        player_builds.append({
+                            'items': items,
+                            'win': match.get('win', False)
+                        })
+
+            # Calculate most common player build
+            from collections import Counter
+            item_frequencies = Counter()
+            for build in player_builds:
+                for item in build['items']:
+                    item_frequencies[item] += 1
+
+            most_common_items = [item for item, count in item_frequencies.most_common(6)]
+
+            return {
+                'champion': most_played_champ,
+                'position': most_played_pos,
+                'optimal_build': optimal_build,
+                'player_most_common_items': most_common_items,
+                'player_builds': player_builds,
+                'games_analyzed': len(player_builds),
+                'meta_winrate': optimal_build.get('win_rate')
+            }
+
+        except Exception as e:
+            print(f"[BUILD ANALYSIS] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def detect_tilt_patterns(self):
+        """Detect tilt patterns: win rate drops after consecutive losses"""
+        print("[TILT DETECTION] Analyzing tilt patterns...")
+
+        try:
+            if len(self.matches) < 10:
+                return None
+
+            # Reverse to chronological order (oldest first)
+            matches = list(reversed(self.matches))
+
+            tilt_episodes = []
+            loss_streak = 0
+            baseline_winrate = sum(1 for m in matches if m['win']) / len(matches)
+
+            # Track performance after losses
+            games_after_2_losses = []
+            games_after_3_losses = []
+            normal_games = []
+
+            for i, match in enumerate(matches):
+                # Check previous games
+                if i >= 2:
+                    prev_2 = matches[i-2:i]
+                    if all(not m['win'] for m in prev_2):
+                        # After 2+ losses
+                        games_after_2_losses.append(match)
+
+                if i >= 3:
+                    prev_3 = matches[i-3:i]
+                    if all(not m['win'] for m in prev_3):
+                        # After 3+ losses
+                        games_after_3_losses.append(match)
+
+                # Track normal baseline (no recent losses)
+                if i >= 2:
+                    prev_2 = matches[i-2:i]
+                    if any(m['win'] for m in prev_2):
+                        normal_games.append(match)
+
+                # Track loss streaks
+                if not match['win']:
+                    loss_streak += 1
+                else:
+                    if loss_streak >= 3:
+                        # End of tilt episode
+                        tilt_episodes.append({
+                            'length': loss_streak,
+                            'ended_at': i
+                        })
+                    loss_streak = 0
+
+            # Calculate win rates
+            wr_after_2_losses = (sum(1 for m in games_after_2_losses if m['win']) / len(games_after_2_losses) * 100) if games_after_2_losses else 0
+            wr_after_3_losses = (sum(1 for m in games_after_3_losses if m['win']) / len(games_after_3_losses) * 100) if games_after_3_losses else 0
+            wr_normal = (sum(1 for m in normal_games if m['win']) / len(normal_games) * 100) if normal_games else baseline_winrate * 100
+
+            # Detect significant tilt
+            tilt_drop_2_losses = wr_normal - wr_after_2_losses
+            tilt_drop_3_losses = wr_normal - wr_after_3_losses
+
+            # Improved tilt detection:
+            # 1. Check if overall win rate is very low (hard stuck/tilted)
+            # 2. Check if performance drops significantly after losses
+            # 3. Check for multiple tilt episodes
+            longest_loss_streak = max([ep['length'] for ep in tilt_episodes], default=0)
+
+            # Determine tilt status with multiple criteria
+            is_heavily_tilting = False
+            is_tilting = False
+            tilt_status = "tilt_proof"
+
+            # Very low overall win rate = heavily tilting/struggling
+            if baseline_winrate < 0.35:
+                is_heavily_tilting = True
+                tilt_status = "heavily_tilting"
+            # Significant performance drop after losses
+            elif tilt_drop_2_losses >= 15 or tilt_drop_3_losses >= 20:
+                is_tilting = True
+                tilt_status = "tilting"
+            # Long loss streaks = tilting
+            elif longest_loss_streak >= 5:
+                is_tilting = True
+                tilt_status = "tilting"
+            # Multiple tilt episodes = prone to tilting
+            elif len(tilt_episodes) >= 3:
+                is_tilting = True
+                tilt_status = "tilt_prone"
+            # Low win rate but not terrible
+            elif baseline_winrate < 0.45:
+                is_tilting = True
+                tilt_status = "struggling"
+
+            return {
+                'is_tilting': is_tilting,
+                'is_heavily_tilting': is_heavily_tilting,
+                'tilt_status': tilt_status,
+                'baseline_winrate': round(baseline_winrate * 100, 1),
+                'wr_after_2_losses': round(wr_after_2_losses, 1),
+                'wr_after_3_losses': round(wr_after_3_losses, 1),
+                'wr_normal': round(wr_normal, 1),
+                'tilt_drop_2_losses': round(tilt_drop_2_losses, 1),
+                'tilt_drop_3_losses': round(tilt_drop_3_losses, 1),
+                'games_analyzed_after_2_losses': len(games_after_2_losses),
+                'games_analyzed_after_3_losses': len(games_after_3_losses),
+                'tilt_episodes': len(tilt_episodes),
+                'longest_loss_streak': longest_loss_streak
+            }
+
+        except Exception as e:
+            print(f"[TILT DETECTION] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def detect_champion_fatigue(self):
+        """Detect champion fatigue: win rate drops after playing same champ consecutively"""
+        print("[CHAMPION FATIGUE] Analyzing champion fatigue...")
+
+        try:
+            if len(self.matches) < 20:
+                return None
+
+            # Reverse to chronological order
+            matches = list(reversed(self.matches))
+
+            # Track performance by game number on same champion
+            champion_sessions = {}  # {champion: {game_num: [wins]}}
+            current_champ = None
+            games_on_champ = 0
+
+            for match in matches:
+                champ = match['championName']
+
+                if champ != current_champ:
+                    # New champion session
+                    current_champ = champ
+                    games_on_champ = 1
+                else:
+                    games_on_champ += 1
+
+                # Track performance by game number
+                if champ not in champion_sessions:
+                    champion_sessions[champ] = defaultdict(list)
+
+                champion_sessions[champ][games_on_champ].append(match['win'])
+
+            # Find fatigue patterns
+            fatigue_detected = []
+
+            for champ, sessions in champion_sessions.items():
+                if len(sessions) < 5:
+                    continue
+
+                # Compare first 3 games vs games 5+
+                early_games = []
+                late_games = []
+
+                for game_num, results in sessions.items():
+                    if game_num <= 3:
+                        early_games.extend(results)
+                    elif game_num >= 5:
+                        late_games.extend(results)
+
+                if len(early_games) >= 3 and len(late_games) >= 3:
+                    early_wr = sum(early_games) / len(early_games) * 100
+                    late_wr = sum(late_games) / len(late_games) * 100
+                    drop = early_wr - late_wr
+
+                    if drop >= 15:
+                        fatigue_detected.append({
+                            'champion': champ,
+                            'early_wr': round(early_wr, 1),
+                            'late_wr': round(late_wr, 1),
+                            'drop': round(drop, 1),
+                            'early_games': len(early_games),
+                            'late_games': len(late_games)
+                        })
+
+            # Sort by biggest drop
+            fatigue_detected.sort(key=lambda x: x['drop'], reverse=True)
+
+            has_fatigue = len(fatigue_detected) > 0
+
+            return {
+                'has_fatigue': has_fatigue,
+                'fatigued_champions': fatigue_detected[:3],  # Top 3
+                'champions_analyzed': len(champion_sessions)
+            }
+
+        except Exception as e:
+            print(f"[CHAMPION FATIGUE] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def analyze_learning_curves(self):
+        """Analyze learning curves: CS/min improving over time, KDA improvements"""
+        print("[LEARNING CURVES] Analyzing learning curves...")
+
+        try:
+            if len(self.matches) < 30:
+                return None
+
+            # Reverse to chronological order
+            matches = list(reversed(self.matches))
+
+            # Split into early and late periods
+            chunk_size = len(matches) // 3
+            early_matches = matches[:chunk_size]
+            mid_matches = matches[chunk_size:chunk_size*2]
+            late_matches = matches[chunk_size*2:]
+
+            def calc_avg_cs_per_min(match_list):
+                cs_rates = []
+                for m in match_list:
+                    duration_min = m.get('gameDuration', 0) / 60
+                    if duration_min > 0:
+                        cs = m.get('totalMinionsKilled', 0) + m.get('neutralMinionsKilled', 0)
+                        cs_rates.append(cs / duration_min)
+                return sum(cs_rates) / len(cs_rates) if cs_rates else 0
+
+            def calc_avg_kda(match_list):
+                kdas = [(m['kills'] + m['assists']) / max(m['deaths'], 1) for m in match_list]
+                return sum(kdas) / len(kdas) if kdas else 0
+
+            def calc_winrate(match_list):
+                wins = sum(1 for m in match_list if m['win'])
+                return (wins / len(match_list) * 100) if match_list else 0
+
+            # Calculate metrics for each period
+            early_cs = calc_avg_cs_per_min(early_matches)
+            mid_cs = calc_avg_cs_per_min(mid_matches)
+            late_cs = calc_avg_cs_per_min(late_matches)
+
+            early_kda = calc_avg_kda(early_matches)
+            mid_kda = calc_avg_kda(mid_matches)
+            late_kda = calc_avg_kda(late_matches)
+
+            early_wr = calc_winrate(early_matches)
+            mid_wr = calc_winrate(mid_matches)
+            late_wr = calc_winrate(late_matches)
+
+            # Calculate improvements
+            cs_improvement = late_cs - early_cs
+            kda_improvement = late_kda - early_kda
+            wr_improvement = late_wr - early_wr
+
+            is_improving = cs_improvement > 0.5 or kda_improvement > 0.3 or wr_improvement > 5
+
+            return {
+                'is_improving': is_improving,
+                'cs_per_min': {
+                    'early': round(early_cs, 2),
+                    'mid': round(mid_cs, 2),
+                    'late': round(late_cs, 2),
+                    'improvement': round(cs_improvement, 2)
+                },
+                'kda': {
+                    'early': round(early_kda, 2),
+                    'mid': round(mid_kda, 2),
+                    'late': round(late_kda, 2),
+                    'improvement': round(kda_improvement, 2)
+                },
+                'winrate': {
+                    'early': round(early_wr, 1),
+                    'mid': round(mid_wr, 1),
+                    'late': round(late_wr, 1),
+                    'improvement': round(wr_improvement, 1)
+                }
+            }
+
+        except Exception as e:
+            print(f"[LEARNING CURVES] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def analyze_meta_adaptation(self):
+        """Analyze how quickly player adapts to meta changes"""
+        print("[META ADAPTATION] Analyzing meta adaptation...")
+
+        try:
+            if len(self.matches) < 20:
+                return None
+
+            # Group matches by patch version
+            patch_stats = defaultdict(lambda: {'games': 0, 'wins': 0, 'champions': set()})
+
+            for match in self.matches:
+                patch = match.get('gameVersion', 'Unknown')
+                # Extract major.minor patch (e.g., "14.23.604.8681" -> "14.23")
+                if patch and '.' in patch:
+                    parts = patch.split('.')
+                    if len(parts) >= 2:
+                        patch = f"{parts[0]}.{parts[1]}"
+
+                patch_stats[patch]['games'] += 1
+                if match['win']:
+                    patch_stats[patch]['wins'] += 1
+                patch_stats[patch]['champions'].add(match['championName'])
+
+            # Sort patches by game count
+            patches = sorted(patch_stats.items(), key=lambda x: x[1]['games'], reverse=True)
+
+            # Calculate champion diversity per patch
+            patch_data = []
+            for patch, stats in patches[:5]:  # Top 5 patches
+                wr = (stats['wins'] / stats['games'] * 100) if stats['games'] > 0 else 0
+                patch_data.append({
+                    'patch': patch,
+                    'games': stats['games'],
+                    'winrate': round(wr, 1),
+                    'unique_champions': len(stats['champions']),
+                    'diversity_score': round(len(stats['champions']) / stats['games'], 2) if stats['games'] > 0 else 0
+                })
+
+            # Check if player explores new champions each patch (good adaptation)
+            avg_diversity = sum(p['diversity_score'] for p in patch_data) / len(patch_data) if patch_data else 0
+            is_adapting = avg_diversity > 0.3  # Playing multiple champions per patch
+
+            return {
+                'is_adapting': is_adapting,
+                'patches_played': len(patches),
+                'patch_data': patch_data,
+                'avg_diversity_score': round(avg_diversity, 2)
+            }
+
+        except Exception as e:
+            print(f"[META ADAPTATION] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def query_knowledge_base(self, query_text, max_results=5):
+        """Query the Bedrock Knowledge Base for League of Legends insights"""
+        try:
+            if KNOWLEDGE_BASE_ID == "YOUR_KNOWLEDGE_BASE_ID":
+                print("[KB] Knowledge Base ID not configured, skipping...")
+                return None
+
+            print(f"[KB] Querying knowledge base: {query_text[:100]}...")
+
+            response = self.bedrock_agent_client.retrieve(
+                knowledgeBaseId=KNOWLEDGE_BASE_ID,
+                retrievalQuery={
+                    'text': query_text
+                },
+                retrievalConfiguration={
+                    'vectorSearchConfiguration': {
+                        'numberOfResults': max_results
+                    }
+                }
+            )
+
+            # Extract relevant context from results
+            contexts = []
+            for result in response.get('retrievalResults', []):
+                content = result.get('content', {}).get('text', '')
+                if content:
+                    contexts.append(content)
+
+            combined_context = "\n\n".join(contexts) if contexts else None
+            print(f"[KB] ✅ Retrieved {len(contexts)} relevant documents")
+            return combined_context
+
+        except Exception as e:
+            print(f"[KB] ❌ Error querying knowledge base: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def generate_roast_with_kb(self, player_context):
+        """Generate roast using Knowledge Base + Retrieve and Generate"""
+        try:
+            if KNOWLEDGE_BASE_ID == "YOUR_KNOWLEDGE_BASE_ID":
+                print("[ROAST KB] Knowledge Base not configured, using standard method")
+                return self.generate_roast()
+
+            print("[ROAST KB] Generating roast with knowledge base context...")
+
+            # Use RetrieveAndGenerate API for RAG
+            response = self.bedrock_agent_client.retrieve_and_generate(
+                input={
+                    'text': f"""You are a SAVAGE League of Legends roaster. Based on this player's stats and League of Legends knowledge, generate 2-4 hilarious roast lines. Be creative, witty, and ruthless (but playful)!
+
+Player Stats:
+{player_context}
+
+Use your knowledge of League of Legends meta, champion abilities, and gameplay strategies to make the roast more accurate and funnier!"""
+                },
+                retrieveAndGenerateConfiguration={
+                    'type': 'KNOWLEDGE_BASE',
+                    'knowledgeBaseConfiguration': {
+                        'knowledgeBaseId': KNOWLEDGE_BASE_ID,
+                        'modelArn': f'arn:aws:bedrock:eu-central-1::foundation-model/{MODEL_ID}',
+                        'retrievalConfiguration': {
+                            'vectorSearchConfiguration': {
+                                'numberOfResults': 5
+                            }
+                        }
+                    }
+                }
+            )
+
+            roast = response['output']['text']
+            print(f"[ROAST KB] ✅ Generated roast with KB: {roast[:100]}...")
+            return roast
+
+        except Exception as e:
+            print(f"[ROAST KB] ❌ Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to regular roast
+            return self.generate_roast()
 
     def generate_roast(self):
         """Generate a savage roast using AI with COMPREHENSIVE data"""
@@ -650,6 +1255,9 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
         # Time analysis
         time_analysis = self.analyze_performance_by_time()
 
+        # NEW: Build analysis
+        build_analysis = self.analyze_build_mistakes()
+
         # Get worst performing champion
         champion_stats = {}
         for match in self.matches:
@@ -669,7 +1277,18 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
                 default=None
             )
 
-        # Build comprehensive prompt
+        # Build comprehensive prompt with build analysis
+        build_roast_section = ""
+        if build_analysis:
+            build_roast_section = f"""
+Item Build Analysis (OP.GG Comparison):
+- Main Champion: {build_analysis['champion']}
+- Position: {build_analysis['position']}
+- Games analyzed: {build_analysis['games_analyzed']}
+- Optimal Build from OP.GG: {build_analysis.get('optimal_build', 'N/A')}
+- Your typical builds: Check if they match the meta!
+"""
+
         prompt = f"""You are a SAVAGE League of Legends roaster. You've been given extensive data about {self.summoner_name}'s gameplay. Pick the FUNNIEST and most BRUTAL things to roast them about. Be creative, witty, and ruthless (but playful)!
 
 📊 COMPREHENSIVE PLAYER DATA:
@@ -702,9 +1321,11 @@ Missed Opportunities:
 
 Time of Day Performance:
 {f"- Best time: {time_analysis.get('best_time', 'Unknown')}" if time_analysis else ""}
-
+{build_roast_section}
 🎯 YOUR TASK:
-Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some unexpected observations. Be savage but keep it fun!"""
+Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some unexpected observations. Be savage but keep it fun! If build data is available, roast their item choices!
+
+At the end write a paragraph or two about things he can do to improve and constructive feedback."""
 
         try:
             print("[ROAST] Sending comprehensive data to AI...")
@@ -732,6 +1353,144 @@ Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some
             import traceback
             traceback.print_exc()
             return "Even the roast bot gave up on you... just like your teammates."
+
+    def recommend_champions(self):
+        """
+        Recommend 2 new champions based on player's stats and playstyle using AI
+        Returns recommendations with champion names, reasons, and OP.GG build links
+        """
+        if not self.matches or len(self.matches) < 5:
+            return None
+
+        try:
+            # Gather comprehensive player stats
+            from collections import Counter
+
+            # Champion pool analysis
+            champion_games = Counter(m['championName'] for m in self.matches)
+            top_champions = champion_games.most_common(5)
+
+            # Role analysis
+            role_counts = Counter(m.get('individualPosition', 'NONE') for m in self.matches)
+            most_played_roles = role_counts.most_common(3)
+
+            # Playstyle analysis
+            total_games = len(self.matches)
+            total_kills = sum(m.get('kills', 0) for m in self.matches)
+            total_deaths = sum(m.get('deaths', 0) for m in self.matches)
+            total_assists = sum(m.get('assists', 0) for m in self.matches)
+            avg_kills = total_kills / total_games
+            avg_deaths = total_deaths / total_games
+            avg_assists = total_assists / total_games
+
+            # Calculate average damage and gold
+            avg_damage = sum(m.get('totalDamageDealtToChampions', 0) for m in self.matches) / total_games
+            avg_gold = sum(m.get('goldEarned', 0) for m in self.matches) / total_games
+
+            # Combat style metrics
+            aggressive_deaths = sum(1 for m in self.matches if m.get('deaths', 0) > 5)
+            penta_kills = sum(m.get('pentaKills', 0) for m in self.matches)
+            quadra_kills = sum(m.get('quadraKills', 0) for m in self.matches)
+            triple_kills = sum(m.get('tripleKills', 0) for m in self.matches)
+
+            # Vision and support metrics
+            avg_vision_score = sum(m.get('visionScore', 0) for m in self.matches) / total_games
+            avg_cc_time = sum(m.get('timeCCingOthers', 0) for m in self.matches) / total_games
+
+            # Win rate
+            wins = sum(1 for m in self.matches if m.get('win'))
+            win_rate = (wins / total_games * 100)
+
+            # Build the prompt
+            prompt = f"""You are an expert League of Legends coach. Analyze this player's stats and recommend 2 NEW champions they should learn that complement their playstyle.
+
+PLAYER STATISTICS:
+- Total Games: {total_games}
+- Win Rate: {win_rate:.1f}%
+- Average KDA: {avg_kills:.1f}/{avg_deaths:.1f}/{avg_assists:.1f}
+- Average Damage: {avg_damage:.0f}
+- Average Gold: {avg_gold:.0f}
+- Vision Score: {avg_vision_score:.1f}
+- CC Time: {avg_cc_time:.1f}s
+- Multikills: {penta_kills} pentas, {quadra_kills} quadras, {triple_kills} triples
+
+CURRENT CHAMPION POOL (DO NOT RECOMMEND THESE):
+{chr(10).join([f'- {champ}: {count} games' for champ, count in top_champions])}
+
+PREFERRED ROLES:
+{chr(10).join([f'- {role}: {count} games' for role, count in most_played_roles if role != 'NONE'])}
+
+TASK:
+Recommend exactly 2 champions they DON'T currently play that would:
+1. Match their playstyle based on the stats above
+2. Be good for their most played roles
+3. Help them improve and expand their champion pool
+4. Be effective in the current meta
+
+For EACH champion, provide:
+1. Champion name
+2. Best role for this player
+3. 2-3 sentence explanation of WHY this champion fits their playstyle (reference specific stats)
+4. One key strength this champion will add to their pool
+
+Format your response as JSON:
+{{
+  "recommendations": [
+    {{
+      "champion": "ChampionName",
+      "role": "TOP/JUNGLE/MID/ADC/SUPPORT",
+      "reason": "Detailed explanation referencing their stats...",
+      "strength": "Key strength this adds to their pool"
+    }}
+  ]
+}}
+
+IMPORTANT: Only recommend champions that exist in League of Legends. Respond with ONLY the JSON, no other text."""
+
+            print("[CHAMPION RECS] Sending request to AI...")
+            response = self.bedrock_client.invoke_model(
+                modelId=MODEL_ID,
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1500,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                })
+            )
+
+            result = json.loads(response['body'].read())
+            ai_response = result['content'][0]['text']
+            print(f"[CHAMPION RECS] AI Response: {ai_response[:200]}...")
+
+            # Parse JSON response
+            import re
+            # Extract JSON from response (in case there's extra text)
+            json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+            if json_match:
+                recommendations_data = json.loads(json_match.group())
+                recommendations = recommendations_data.get('recommendations', [])
+
+                # Add OP.GG links
+                for rec in recommendations:
+                    champion_name = rec['champion'].lower().replace(' ', '').replace("'", '')
+                    role = rec['role'].lower()
+                    rec['opgg_url'] = f"https://www.op.gg/lol/champions/{champion_name}/build/{role}"
+
+                print(f"[CHAMPION RECS] ✅ Generated {len(recommendations)} recommendations")
+                return recommendations[:2]  # Ensure only 2 recommendations
+            else:
+                print("[CHAMPION RECS] ❌ Could not parse JSON from response")
+                return None
+
+        except Exception as e:
+            print(f"[CHAMPION RECS] ❌ ERROR: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def analyze_cs_efficiency(self):
         """Analyze CS (Creep Score) per minute by month"""
@@ -946,3 +1705,236 @@ Write 2-4 hilarious roast lines. Choose the FUNNIEST stats to roast. Mix in some
         print(f"[KILL_STEALS] Found {kill_steal_stats['kill_steals']} kill steals out of {kill_steal_stats['total_kills']} total kills")
 
         return kill_steal_stats
+
+    def analyze_comeback_potential(self):
+        """Analyze how well player performs when behind (Comeback King Score)"""
+        if not self.matches:
+            return None
+
+        comeback_games = 0
+        total_deficit_games = 0
+        biggest_comeback = None
+        max_comeback_gold = 0
+
+        for match in self.matches:
+            # Check if gold data is available
+            gold_at_15 = match.get('goldPerMinDeltas', {}).get('0-15', 0)
+            total_gold = match.get('goldEarned', 0)
+            game_duration = match.get('gameDuration', 0)
+            won = match.get('win', False)
+
+            # Rough estimate: if player had less than average gold at 15 min, they were behind
+            # Average is around 300-400 gold per minute in first 15 min
+            if gold_at_15 > 0 and gold_at_15 < 350:  # Behind threshold
+                total_deficit_games += 1
+                if won:
+                    comeback_games += 1
+                    deficit = 350 - gold_at_15
+                    if deficit > max_comeback_gold:
+                        max_comeback_gold = deficit
+                        biggest_comeback = match
+
+        comeback_rate = (comeback_games / total_deficit_games * 100) if total_deficit_games > 0 else 0
+
+        return {
+            'comeback_games': comeback_games,
+            'total_deficit_games': total_deficit_games,
+            'comeback_rate': round(comeback_rate, 1),
+            'biggest_comeback': biggest_comeback,
+            'comeback_score': min(100, round(comeback_rate * 1.2, 0))  # Boosted score
+        }
+
+    def analyze_power_spikes(self):
+        """Identify which game phases the player excels in (early/mid/late)"""
+        if not self.matches:
+            return None
+
+        phase_stats = {
+            'early': {'kills': 0, 'deaths': 0, 'games': 0},  # 0-15 min
+            'mid': {'kills': 0, 'deaths': 0, 'games': 0},    # 15-25 min
+            'late': {'kills': 0, 'deaths': 0, 'games': 0}    # 25+ min
+        }
+
+        for match in self.matches:
+            duration = match.get('gameDuration', 0)
+            kills = match.get('kills', 0)
+            deaths = match.get('deaths', 0)
+
+            # Estimate distribution (simplified - ideally would use timeline data)
+            if duration < 900:  # < 15 min (short game)
+                phase_stats['early']['kills'] += kills
+                phase_stats['early']['deaths'] += deaths
+                phase_stats['early']['games'] += 1
+            elif duration < 1500:  # 15-25 min
+                # Distribute between early and mid
+                phase_stats['early']['kills'] += kills * 0.4
+                phase_stats['early']['deaths'] += deaths * 0.4
+                phase_stats['mid']['kills'] += kills * 0.6
+                phase_stats['mid']['deaths'] += deaths * 0.6
+                phase_stats['mid']['games'] += 1
+            else:  # 25+ min
+                # Distribute across all phases
+                phase_stats['early']['kills'] += kills * 0.3
+                phase_stats['early']['deaths'] += deaths * 0.3
+                phase_stats['mid']['kills'] += kills * 0.35
+                phase_stats['mid']['deaths'] += deaths * 0.35
+                phase_stats['late']['kills'] += kills * 0.35
+                phase_stats['late']['deaths'] += deaths * 0.35
+                phase_stats['late']['games'] += 1
+
+        # Calculate KDA for each phase
+        for phase in ['early', 'mid', 'late']:
+            kills = phase_stats[phase]['kills']
+            deaths = max(phase_stats[phase]['deaths'], 1)
+            phase_stats[phase]['kda'] = round(kills / deaths, 2)
+
+        # Determine best phase
+        best_phase = max(phase_stats.items(), key=lambda x: x[1]['kda'])
+
+        return {
+            'phase_stats': phase_stats,
+            'best_phase': best_phase[0],
+            'best_phase_kda': best_phase[1]['kda']
+        }
+
+    def analyze_objective_priority(self):
+        """Analyze dragon/baron participation and correlation with wins"""
+        if not self.matches:
+            return None
+
+        total_games = len(self.matches)
+        dragon_kills = sum(m.get('dragonKills', 0) for m in self.matches)
+        baron_kills = sum(m.get('baronKills', 0) for m in self.matches)
+
+        # Games with high objective participation
+        high_obj_games = [m for m in self.matches if m.get('dragonKills', 0) + m.get('baronKills', 0) >= 2]
+        high_obj_wins = sum(1 for m in high_obj_games if m.get('win'))
+        high_obj_winrate = (high_obj_wins / len(high_obj_games) * 100) if high_obj_games else 0
+
+        # Overall winrate for comparison
+        total_wins = sum(1 for m in self.matches if m.get('win'))
+        overall_winrate = (total_wins / total_games * 100) if total_games > 0 else 0
+
+        objective_impact = high_obj_winrate - overall_winrate
+
+        return {
+            'avg_dragons_per_game': round(dragon_kills / total_games, 1),
+            'avg_barons_per_game': round(baron_kills / total_games, 1),
+            'high_obj_winrate': round(high_obj_winrate, 1),
+            'overall_winrate': round(overall_winrate, 1),
+            'objective_impact': round(objective_impact, 1),
+            'is_objective_focused': objective_impact > 5
+        }
+
+    def analyze_duo_synergy(self):
+        """Identify best teammates/duo partners based on win rate"""
+        if not self.matches:
+            return None
+
+        # Track performance with each teammate
+        teammate_stats = {}
+
+        for match in self.matches:
+            # Get teammates from match (this would need team data from API)
+            # For now, we'll use a simplified approach
+            won = match.get('win', False)
+
+            # Note: This requires additional data from match API about other players
+            # Placeholder implementation
+            teammates = match.get('teammates', [])  # Would need to be added to match data
+
+            for teammate in teammates:
+                # Create a unique key from teammate data (teammate is a dict)
+                if isinstance(teammate, dict):
+                    teammate_key = f"{teammate.get('riotIdGameName', 'Unknown')}#{teammate.get('riotIdTagline', '')}"
+                else:
+                    teammate_key = str(teammate)
+
+                if teammate_key not in teammate_stats:
+                    teammate_stats[teammate_key] = {'games': 0, 'wins': 0}
+
+                teammate_stats[teammate_key]['games'] += 1
+                if won:
+                    teammate_stats[teammate_key]['wins'] += 1
+
+        # Calculate win rates and find best duo partners
+        duo_partners = []
+        for teammate_key, stats in teammate_stats.items():
+            if stats['games'] >= 3:  # Minimum 3 games together
+                winrate = (stats['wins'] / stats['games'] * 100)
+                duo_partners.append({
+                    'name': teammate_key,
+                    'games': stats['games'],
+                    'winrate': round(winrate, 1)
+                })
+
+        duo_partners.sort(key=lambda x: (x['winrate'], x['games']), reverse=True)
+
+        return {
+            'best_duo_partners': duo_partners[:5],
+            'has_consistent_duo': len([p for p in duo_partners if p['games'] >= 5]) > 0
+        }
+
+    def analyze_tilt_factor(self):
+        """Detect performance degradation after losses (mental fortitude)"""
+        if not self.matches or len(self.matches) < 10:
+            return None
+
+        # Sort matches by game creation time (oldest first)
+        sorted_matches = sorted(self.matches, key=lambda m: m.get('gameCreation', 0))
+
+        # Track performance after wins vs after losses
+        after_loss_stats = {'games': 0, 'wins': 0, 'total_kda': 0}
+        after_win_stats = {'games': 0, 'wins': 0, 'total_kda': 0}
+        loss_streaks = []
+        current_streak = 0
+        max_loss_streak = 0
+
+        prev_result = None
+        for match in sorted_matches:
+            won = match.get('win', False)
+            kda = (match.get('kills', 0) + match.get('assists', 0)) / max(match.get('deaths', 1), 1)
+
+            # Track stats based on previous game result
+            if prev_result is not None:
+                if prev_result == False:  # After a loss
+                    after_loss_stats['games'] += 1
+                    after_loss_stats['total_kda'] += kda
+                    if won:
+                        after_loss_stats['wins'] += 1
+                else:  # After a win
+                    after_win_stats['games'] += 1
+                    after_win_stats['total_kda'] += kda
+                    if won:
+                        after_win_stats['wins'] += 1
+
+            # Track loss streaks
+            if not won:
+                current_streak += 1
+                max_loss_streak = max(max_loss_streak, current_streak)
+            else:
+                if current_streak > 0:
+                    loss_streaks.append(current_streak)
+                current_streak = 0
+
+            prev_result = won
+
+        # Calculate averages
+        after_loss_kda = after_loss_stats['total_kda'] / after_loss_stats['games'] if after_loss_stats['games'] > 0 else 0
+        after_win_kda = after_win_stats['total_kda'] / after_win_stats['games'] if after_win_stats['games'] > 0 else 0
+        after_loss_winrate = (after_loss_stats['wins'] / after_loss_stats['games'] * 100) if after_loss_stats['games'] > 0 else 0
+
+        # Tilt score: higher = less tilt (more mental fortitude)
+        kda_drop = after_win_kda - after_loss_kda
+        tilt_score = max(0, 100 - (kda_drop * 20) - (max_loss_streak * 5))
+
+        return {
+            'after_loss_kda': round(after_loss_kda, 2),
+            'after_win_kda': round(after_win_kda, 2),
+            'kda_drop_after_loss': round(kda_drop, 2),
+            'after_loss_winrate': round(after_loss_winrate, 1),
+            'max_loss_streak': max_loss_streak,
+            'avg_loss_streak': round(sum(loss_streaks) / len(loss_streaks), 1) if loss_streaks else 0,
+            'tilt_score': round(tilt_score, 0),
+            'mental_fortitude': 'Unshakeable' if tilt_score > 80 else 'Strong' if tilt_score > 60 else 'Average' if tilt_score > 40 else 'Needs Work'
+        }

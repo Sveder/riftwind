@@ -6,18 +6,126 @@ $(document).ready(function() {
         ddragonVersion = versions[0];
     });
 
+    // Initialize IndexedDB
+    let db;
+    const dbName = 'RiftwindDB';
+    const storeName = 'summonerData';
+
+    function initDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(dbName, 1);
+
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                db = request.result;
+                resolve(db);
+            };
+
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName, { keyPath: 'id' });
+                }
+            };
+        });
+    }
+
+    function saveToIndexedDB(key, data) {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.put({ id: key, data: data, timestamp: Date.now() });
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    function getFromIndexedDB(key) {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(key);
+
+            request.onsuccess = () => resolve(request.result ? request.result.data : null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // Initialize DB on page load
+    initDB().catch(err => console.error('Failed to initialize IndexedDB:', err));
+
+    // Auto-detect region from tag input
+    $('#riotId').on('input', function() {
+        const riotId = $(this).val().trim();
+        const parts = riotId.split('#');
+
+        if (parts.length === 2) {
+            const tag = parts[1].trim().toUpperCase();
+
+            // Map common tag patterns to regions
+            const regionMap = {
+                'NA': 'na1',
+                'NA1': 'na1',
+                'EUW': 'euw1',
+                'EUW1': 'euw1',
+                'EUNE': 'eun1',
+                'EUNE1': 'eun1',
+                'KR': 'kr',
+                'BR': 'br1',
+                'BR1': 'br1',
+                'LAN': 'la1',
+                'LA1': 'la1',
+                'LAS': 'la2',
+                'LA2': 'la2',
+                'OCE': 'oc1',
+                'OC1': 'oc1',
+                'TR': 'tr1',
+                'TR1': 'tr1',
+                'RU': 'ru',
+                'JP': 'jp1',
+                'JP1': 'jp1',
+                'PH': 'ph2',
+                'PH2': 'ph2',
+                'SG': 'sg2',
+                'SG2': 'sg2',
+                'TH': 'th2',
+                'TH2': 'th2',
+                'TW': 'tw2',
+                'TW2': 'tw2',
+                'VN': 'vn2',
+                'VN2': 'vn2'
+            };
+
+            // Check if tag matches a region
+            if (regionMap[tag]) {
+                $('#region').val(regionMap[tag]);
+                console.log('[AUTO-DETECT] Region set to:', regionMap[tag], 'based on tag:', tag);
+            }
+        }
+    });
+
     // Handle form submission
     $('#summonerForm').on('submit', function(e) {
         e.preventDefault();
 
-        const gameName = $('#gameName').val().trim();
-        const tagLine = $('#tagLine').val().trim();
+        const riotId = $('#riotId').val().trim();
         const region = $('#region').val();
 
-        if (!gameName || !tagLine) {
-            showError('Please enter both Game Name and Tag Line');
+        if (!riotId) {
+            showError('Please enter your Riot ID');
             return;
         }
+
+        // Split on # to get gameName and tagLine
+        const parts = riotId.split('#');
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            showError('Please enter your Riot ID in the format: nickname#Tag (e.g., Jankos#EUW)');
+            return;
+        }
+
+        const gameName = parts[0].trim();
+        const tagLine = parts[1].trim();
 
         // Disable submit button to prevent double submission
         const submitBtn = $('#summonerForm button[type="submit"]');
@@ -59,48 +167,32 @@ $(document).ready(function() {
         });
     });
 
-    function displayResults(data) {
-        // Save data to localStorage for year-in-review
+    async function displayResults(data) {
+        // Save data to IndexedDB for year-in-review
         const region = $('#region').val();
         data.region = region;
-        localStorage.setItem('summonerData', JSON.stringify(data));
 
-        // Hide loading
-        $('.loading').hide();
-
-        // Show results section
-        $('.result-section').show();
-
-        // Display summoner info
-        $('#summonerName').text(data.summoner.name);
-        $('#summonerLevel').text(data.summoner.level);
-        $('#levelDisplay').text(data.summoner.level);
-
-        // Set profile icon
-        const profileIconUrl = `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/profileicon/${data.summoner.profileIconId}.png`;
-        $('#profileIcon').attr('src', profileIconUrl);
-
-        // Display total games
-        $('#totalGames').text(data.totalGames);
-
-        // Display most played champion
-        if (data.mostPlayedChampion && data.mostPlayedChampion.championName) {
-            const championIconUrl = `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/champion/${data.mostPlayedChampion.championName}.png`;
-            $('#championIcon').attr('src', championIconUrl);
-            $('#championName').text(data.mostPlayedChampion.championName);
-            $('#championLevel').text(data.mostPlayedChampion.championLevel);
-            $('#championPoints').text(data.mostPlayedChampion.championPoints.toLocaleString());
-        } else {
-            $('#championName').text('No champion data available');
-            $('#championLevel').text('0');
-            $('#championPoints').text('0');
+        try {
+            // Save all data including timelines to IndexedDB
+            await saveToIndexedDB('summonerData', data);
+            console.log('Saved all summoner data to IndexedDB');
+        } catch (e) {
+            console.error('Failed to save to IndexedDB:', e);
+            // Fallback: try without timelines
+            try {
+                const dataWithoutTimelines = {...data};
+                delete dataWithoutTimelines.matchTimelines;
+                await saveToIndexedDB('summonerData', dataWithoutTimelines);
+                console.log('Saved summoner data without timelines to IndexedDB');
+            } catch (fallbackError) {
+                console.error('Failed to save even without timelines:', fallbackError);
+            }
         }
 
-        // Display top 5 champions
-        displayTopChampions(data.topChampions);
-
-        // Display recent matches
-        displayRecentMatches(data.recentMatches);
+        // Redirect directly to year-in-review page
+        const summonerName = data.summoner.name;
+        const urlParams = `?summoner=${encodeURIComponent(summonerName)}&region=${region}`;
+        window.location.href = `/year-in-review${urlParams}`;
     }
 
     function displayTopChampions(champions) {
@@ -239,8 +331,7 @@ $(document).ready(function() {
 
 // Quick fill function for famous streamers
 function quickFill(gameName, tagLine, region) {
-    $('#gameName').val(gameName);
-    $('#tagLine').val(tagLine);
+    $('#riotId').val(gameName + '#' + tagLine);
     $('#region').val(region);
     $('#summonerForm').submit();
 }
@@ -280,11 +371,11 @@ $(document).ready(function() {
                 $('#feedbackEmail').val('');
                 submitBtn.prop('disabled', false).text('Send Feedback');
 
-                // Close modal after 2 seconds
+                // Close modal after 4 seconds
                 setTimeout(function() {
                     $('#feedbackModal').modal('hide');
                     $('#feedbackSuccess').hide();
-                }, 2000);
+                }, 4000);
             },
             error: function(xhr) {
                 $('#feedbackError').show();

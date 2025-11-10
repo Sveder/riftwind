@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ward Placement Game - Riftwind</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Beaufort+for+LOL:wght@400;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #010A13 0%, #0A1428 50%, #1E2328 100%);
+            font-family: 'Beaufort for LOL', 'Segoe UI', sans-serif;
+            color: #E4E1D8;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Logo Header */
+        .logo-header {
+            padding: 15px 30px;
+            background: rgba(1, 10, 19, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            border-bottom: 1px solid rgba(199, 155, 59, 0.2);
+        }
+
+        .logo-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .logo-img {
+            height: 30px;
+            width: auto;
+            margin-right: 10px;
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #C79B3B 0%, #D4AF37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Game Container */
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 120px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Map Canvas */
+        #mapCanvas {
+            display: block;
+            border: 3px solid #C79B3B;
+            border-radius: 10px;
+            cursor: crosshair;
+            background: #1a4d2e;
+            max-width: 90vw;
+            max-height: 80vh;
+        }
+
+        /* Stats Panel */
+        .stats-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(30, 35, 40, 0.95);
+            border: 2px solid #C79B3B;
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 250px;
+        }
+
+        .stat-item {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-label {
+            color: #A09B8C;
+            font-size: 0.9rem;
+        }
+
+        .stat-value {
+            color: #C79B3B;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .ward-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: #FFD700;
+            border-radius: 50%;
+            margin: 0 2px;
+        }
+
+        .ward-icon.depleted {
+            background: #3C3C3C;
+        }
+
+        /* Modal Styling */
+        .modal-content {
+            background: #1E2328;
+            border: 3px solid #C79B3B;
+            color: #E4E1D8;
+        }
+
+        .modal-header {
+            border-bottom: 2px solid #C79B3B;
+        }
+
+        .modal-title {
+            color: #FFD700;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .modal-body {
+            font-size: 1.1rem;
+            line-height: 1.8;
+        }
+
+        .instruction-item {
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(199, 155, 59, 0.1);
+            border-left: 3px solid #C79B3B;
+            border-radius: 5px;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #C79B3B 0%, #D4AF37 100%);
+            border: none;
+            color: #0A1428;
+            font-size: 1.3rem;
+            font-weight: bold;
+            padding: 15px 40px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(199, 155, 59, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <!-- Logo Header -->
+    <header class="logo-header">
+        <a href="/" class="logo-link">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Riftwind Logo" class="logo-img">
+            <span class="logo-text">Riftwind - Ward Game</span>
+        </a>
+    </header>
+
+    <!-- Game Container -->
+    <div id="gameContainer">
+        <canvas id="mapCanvas" width="800" height="800"></canvas>
+
+        <!-- Stats Panel -->
+        <div class="stats-panel">
+            <h4 style="color: #C79B3B; margin-bottom: 15px;">Game Stats</h4>
+
+            <div class="stat-item">
+                <span class="stat-label">Available Wards:</span>
+                <span id="wardCount" class="stat-value">3</span>
+            </div>
+
+            <div class="stat-item">
+                <span class="stat-label">Ward Uptime:</span>
+                <span id="wardUptime" class="stat-value">0s</span>
+            </div>
+
+            <div class="stat-item">
+                <span class="stat-label">Time Elapsed:</span>
+                <span id="timeElapsed" class="stat-value">0s</span>
+            </div>
+
+            <hr style="border-color: #C79B3B; margin: 15px 0;">
+
+            <div class="stat-item">
+                <span class="stat-label">Enemy Spotted:</span>
+                <span id="spotCount" class="stat-value">0</span>
+            </div>
+
+            <div class="stat-item">
+                <span class="stat-label">Vision Score:</span>
+                <span id="visionScore" class="stat-value">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions Modal -->
+    <div class="modal fade" id="instructionsModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">👁️ Ward Placement Challenge</h3>
+                </div>
+                <div class="modal-body">
+                    <p style="color: #A09B8C; margin-bottom: 20px;">
+                        Master the art of vision control! Place wards strategically to spot the enemy moving through the fog of war.
+                    </p>
+
+                    <div class="instruction-item">
+                        <strong style="color: #FFD700;">🎯 Objective:</strong>
+                        Keep vision on the map and spot the red enemy dot as many times as possible!
+                    </div>
+
+                    <div class="instruction-item">
+                        <strong style="color: #FFD700;">👆 How to Play:</strong>
+                        Click anywhere on the map to place a ward. It will reveal a radius around it.
+                    </div>
+
+                    <div class="instruction-item">
+                        <strong style="color: #FFD700;">⏰ Ward Duration:</strong>
+                        Each ward lasts 10-30 seconds before expiring. Plan your placements wisely!
+                    </div>
+
+                    <div class="instruction-item">
+                        <strong style="color: #FFD700;">📊 Ward Limit:</strong>
+                        You can have up to 3 wards active. When one expires, you get it back!
+                    </div>
+
+                    <div class="instruction-item">
+                        <strong style="color: #FFD700;">🔴 Enemy Movement:</strong>
+                        A red dot moves around the map. Spot it with your wards to score points!
+                    </div>
+
+                    <div class="instruction-item">
+                        <strong style="color: #FFD700;">🏆 Vision Score:</strong>
+                        Based on total ward uptime and number of enemy spots. Maximize both!
+                    </div>
+
+                    <div class="instruction-item">
+                        <strong style="color: #FFD700;">🎯 Minion Last Hitting:</strong>
+                        Green minions spawn periodically! Click them when their health is low (gold color = ready to last hit). Practice your CS while managing vision!
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 2px solid #C79B3B;">
+                    <button type="button" class="btn-start" data-bs-dismiss="modal">Start Game!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='ward_game.js') }}"></script>
+</body>
+</html>
