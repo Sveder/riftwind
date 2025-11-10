@@ -98,7 +98,7 @@ def cached_get(url, headers_tuple):
 
 # You need to get your API key from https://developer.riotgames.com/
 RIOT_API_KEY = os.environ.get('RIOT_API_KEY', 'YOUR_API_KEY_HERE')
-RIOT_API_KEY = "RGAPI-d0a4d97c-22d6-44a1-a7d2-ccd69cc1b45e"
+RIOT_API_KEY = "RGAPI-b8c5eadf-fa1a-4955-bdce-2b86b8f19780"
 
 # Regional routing values
 REGION_ROUTING = {
@@ -246,10 +246,10 @@ Timestamp: {search_time}
         start_2025 = int(datetime(2025, 1, 1).timestamp())
         end_2025 = int(datetime(2025, 12, 31, 23, 59, 59).timestamp())
 
-        # Fetch matches in batches (max 100 per request, fetch up to 400 total)
+        # Fetch matches in batches (max 100 per request, fetch ALL available)
         match_ids = []
         matches_per_batch = 100
-        max_matches = 400
+        max_matches = 327  # High limit to fetch all available matches
 
         for start_index in range(0, max_matches, matches_per_batch):
             match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?startTime={start_2025}&endTime={end_2025}&start={start_index}&count={matches_per_batch}'
@@ -296,9 +296,9 @@ Timestamp: {search_time}
         total_games = len(match_ids)
         print(f"[MATCH API] Retrieved {total_games} total match IDs from 2025")
 
-        # Step 5: Get detailed match data - fetch up to 75 for initial load (quick response)
+        # Step 5: Get detailed match data - fetch first 75 for initial load
         match_details = []
-        matches_to_fetch = match_ids[:75]
+        matches_to_fetch = match_ids[:75]  # Fetch first 75 matches for initial load
         print(f"[MATCH DETAILS] Fetching details for {len(matches_to_fetch)} matches (initial batch)")
 
         # Track first and last match dates
@@ -310,16 +310,18 @@ Timestamp: {search_time}
             print(f"[MATCH DETAILS] Fetching match {i+1}/{len(matches_to_fetch)}: {match_id}")
 
             # Try cache first
-            match_data = cached_request(match_detail_url, headers)
+            cache_key = get_cache_key(match_detail_url, headers)
+            match_data = get_from_cache(cache_key)
+
             if match_data is None:
                 # Add sleep before making API request to avoid rate limits
-                if i > 0 and i % 10 == 0:  # Sleep every 10 requests
-                    print(f"[MATCH DETAILS] Sleeping 1.5 seconds to avoid rate limit...")
-                    time.sleep(1.5)
+                # Sleep 0.1 seconds between each request (max 10 req/sec)
+                time.sleep(0.1)
 
                 detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
                 if detail_response.status_code == 200:
                     match_data = detail_response.json()
+                    save_to_cache(cache_key, match_data)
                     print(f"[MATCH DETAILS] Successfully fetched match {match_id}")
                 elif detail_response.status_code == 429:
                     print(f"[MATCH DETAILS] Rate limited (429) on match {match_id}, sleeping for 3 seconds...")
@@ -352,6 +354,10 @@ Timestamp: {search_time}
 
                 match_details.append(match_data)
 
+            # Progress logging every 50 matches
+            if (i + 1) % 50 == 0:
+                print(f"[MATCH DETAILS] Progress: {i + 1}/{len(matches_to_fetch)} matches fetched")
+
         print(f"[MATCH DETAILS] Total matches fetched: {len(match_details)}")
 
         # Display match date range
@@ -360,22 +366,27 @@ Timestamp: {search_time}
             print(f"[MATCH DATE RANGE] Last match: {last_match_date.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"[MATCH DATE RANGE] Total span: {(first_match_date - last_match_date).days} days")
 
-        # Step 6: Get timeline data for multiple matches (for kill steal analysis)
+        # Step 6: Get timeline data for ALL matches (for comprehensive analysis)
         match_timelines = []
-        timeline_fetch_limit = min(10, len(match_ids))  # Fetch up to 10 timelines for initial load
+        timeline_fetch_limit = len(match_ids)  # Fetch ALL timelines
 
-        print(f"[TIMELINE] Fetching timelines for {timeline_fetch_limit} matches (initial batch)...")
-        for i, match_id in enumerate(match_ids[:timeline_fetch_limit]):
+        print(f"[TIMELINE] Fetching timelines for {timeline_fetch_limit} matches...")
+        for i, match_id in enumerate(match_ids):
             timeline_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{match_id}/timeline'
 
             # Try cache first
-            timeline_data = cached_request(timeline_url, headers)
+            cache_key = get_cache_key(timeline_url, headers)
+            timeline_data = get_from_cache(cache_key)
 
             # If not in cache, fetch from API with retry logic
             if not timeline_data:
+                # Rate limiting - sleep 0.1 seconds between requests
+                time.sleep(0.1)
+
                 timeline_response = requests.get(timeline_url, headers=headers, timeout=30)
                 if timeline_response.status_code == 200:
                     timeline_data = timeline_response.json()
+                    save_to_cache(cache_key, timeline_data)
                     print(f"[TIMELINE] Fetched timeline {i+1}/{timeline_fetch_limit}: {match_id}")
                 elif timeline_response.status_code == 429:
                     print(f"[TIMELINE] Rate limited (429) on timeline {match_id}, sleeping for 2 seconds...")
@@ -396,6 +407,10 @@ Timestamp: {search_time}
                     'match_id': match_id,
                     'timeline': timeline_data
                 })
+
+            # Progress logging every 50 timelines
+            if (i + 1) % 50 == 0:
+                print(f"[TIMELINE] Progress: {i + 1}/{timeline_fetch_limit} timelines fetched")
 
         print(f"[TIMELINE] Successfully fetched {len(match_timelines)} timelines")
 
@@ -620,7 +635,7 @@ def get_summoner_full_data():
 
         match_ids = []
         matches_per_batch = 100
-        max_matches = 500  # Fetch up to 500 total
+        max_matches = 327  # High limit to fetch all available matches
 
         for start_index in range(0, max_matches, matches_per_batch):
             match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?startTime={start_2025}&endTime={end_2025}&start={start_index}&count={matches_per_batch}'
@@ -652,45 +667,27 @@ def get_summoner_full_data():
 
         print(f"[FULL DATA] Retrieved {len(match_ids)} total match IDs")
 
-        # Step 3: Fetch all 500 match details with smart rate limiting
+        # Step 3: Fetch ALL match details with smart rate limiting
         match_details = []
-        matches_to_fetch = match_ids[:500]
+        matches_to_fetch = match_ids  # Fetch all matches
 
         print(f"[FULL DATA] Fetching {len(matches_to_fetch)} match details with rate limiting...")
-
-        # Rate limit strategy: 20 req/sec, 100 req/2min
-        # Safe approach: 15 requests per second with pauses
-        requests_in_batch = 0
-        batch_start_time = time.time()
 
         for i, match_id in enumerate(matches_to_fetch):
             match_detail_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{match_id}'
 
             # Try cache first
-            match_data = cached_request(match_detail_url, headers)
+            cache_key = get_cache_key(match_detail_url, headers)
+            match_data = get_from_cache(cache_key)
+
             if match_data is None:
-                # Rate limiting logic
-                requests_in_batch += 1
-
-                # Every 15 requests, ensure we haven't exceeded 1 second
-                if requests_in_batch >= 15:
-                    elapsed = time.time() - batch_start_time
-                    if elapsed < 1.0:
-                        sleep_time = 1.0 - elapsed
-                        print(f"[FULL DATA] Rate limit pause: {sleep_time:.2f}s")
-                        time.sleep(sleep_time)
-                    requests_in_batch = 0
-                    batch_start_time = time.time()
-
-                # Every 90 requests, take a longer pause (2min limit)
-                if i > 0 and i % 90 == 0:
-                    print(f"[FULL DATA] Long pause to respect 100/2min limit...")
-                    time.sleep(5)
+                # Rate limiting - sleep 0.1 seconds between requests (max 10 req/sec)
+                time.sleep(0.1)
 
                 detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
                 if detail_response.status_code == 200:
                     match_data = detail_response.json()
-                    save_to_cache(get_cache_key(match_detail_url, headers), match_data)
+                    save_to_cache(cache_key, match_data)
                 elif detail_response.status_code == 429:
                     print(f"[FULL DATA] Rate limited, sleeping 5 seconds...")
                     time.sleep(5)
@@ -718,6 +715,51 @@ def get_summoner_full_data():
                 print(f"[FULL DATA] Progress: {i + 1}/{len(matches_to_fetch)} matches fetched")
 
         print(f"[FULL DATA] Total matches fetched: {len(match_details)}")
+
+        # Step 4: Fetch ALL timelines
+        match_timelines = []
+        print(f"[FULL DATA] Fetching timelines for {len(match_ids)} matches...")
+
+        for i, match_id in enumerate(match_ids):
+            timeline_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{match_id}/timeline'
+
+            # Try cache first
+            cache_key = get_cache_key(timeline_url, headers)
+            timeline_data = get_from_cache(cache_key)
+
+            if not timeline_data:
+                # Rate limiting - sleep 0.1 seconds between requests
+                time.sleep(0.1)
+
+                timeline_response = requests.get(timeline_url, headers=headers, timeout=30)
+                if timeline_response.status_code == 200:
+                    timeline_data = timeline_response.json()
+                    save_to_cache(cache_key, timeline_data)
+                elif timeline_response.status_code == 429:
+                    print(f"[FULL DATA] Timeline rate limited, sleeping 5 seconds...")
+                    time.sleep(5)
+                    timeline_response = requests.get(timeline_url, headers=headers, timeout=30)
+                    if timeline_response.status_code == 200:
+                        timeline_data = timeline_response.json()
+                        save_to_cache(get_cache_key(timeline_url, headers), timeline_data)
+                    else:
+                        print(f"[FULL DATA] Still rate limited on timelines")
+                        continue
+                else:
+                    print(f"[FULL DATA] Failed to fetch timeline {match_id}: {timeline_response.status_code}")
+                    continue
+
+            if timeline_data:
+                match_timelines.append({
+                    'match_id': match_id,
+                    'timeline': timeline_data
+                })
+
+            # Progress logging every 50 timelines
+            if (i + 1) % 50 == 0:
+                print(f"[FULL DATA] Timeline progress: {i + 1}/{len(match_ids)} fetched")
+
+        print(f"[FULL DATA] Successfully fetched {len(match_timelines)} timelines")
 
         # Process matches (same as original endpoint)
         processed_matches = []
@@ -817,7 +859,8 @@ def get_summoner_full_data():
 
         return jsonify({
             'matches': processed_matches,
-            'total_matches': len(processed_matches)
+            'total_matches': len(processed_matches),
+            'timelines': match_timelines
         })
 
     except Exception as e:

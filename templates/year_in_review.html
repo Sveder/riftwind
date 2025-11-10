@@ -500,6 +500,30 @@
         </div>
     </div>
 
+    <!-- Background Music -->
+    <audio id="bgMusic" loop>
+        <source src="{{ url_for('static', filename='Silver Scrapes.mp3') }}" type="audio/mpeg">
+    </audio>
+
+    <!-- Music Control Button (Fixed Position) -->
+    <button id="musicBtn" style="
+        position: fixed;
+        bottom: 30px;
+        right: 180px;
+        background: linear-gradient(135deg, #C79B3B 0%, #D4AF37 100%);
+        border: none;
+        color: #0A1428;
+        font-weight: bold;
+        padding: 15px 25px;
+        border-radius: 50px;
+        cursor: pointer;
+        box-shadow: 0 5px 20px rgba(199, 155, 59, 0.4);
+        z-index: 1000;
+        transition: all 0.3s ease;
+    " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 8px 25px rgba(199, 155, 59, 0.6)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 5px 20px rgba(199, 155, 59, 0.4)';" onclick="toggleMusic()">
+        🔊 Stop Music
+    </button>
+
     <!-- Feedback Button (Fixed Position) -->
     <button id="feedbackBtn" style="
         position: fixed;
@@ -603,6 +627,46 @@
                         submitBtn.prop('disabled', false).text('Send Feedback');
                     }
                 });
+            });
+        });
+
+        // Music control function
+        function toggleMusic() {
+            const music = document.getElementById('bgMusic');
+            const btn = document.getElementById('musicBtn');
+
+            if (music.paused) {
+                music.play();
+                btn.innerHTML = '🔊 Stop Music';
+                localStorage.setItem('musicPlaying', 'true');
+            } else {
+                music.pause();
+                btn.innerHTML = '🔇 Play Music';
+                localStorage.setItem('musicPlaying', 'false');
+            }
+        }
+
+        // Auto-play music when page loads (respecting user preference)
+        window.addEventListener('DOMContentLoaded', function() {
+            const music = document.getElementById('bgMusic');
+            const btn = document.getElementById('musicBtn');
+            const musicPreference = localStorage.getItem('musicPlaying');
+
+            // If user previously stopped music, don't play
+            if (musicPreference === 'false') {
+                music.pause();
+                btn.innerHTML = '🔇 Play Music';
+                return;
+            }
+
+            // Try to auto-play (may be blocked by browser policies)
+            music.play().then(function() {
+                btn.innerHTML = '🔊 Stop Music';
+                localStorage.setItem('musicPlaying', 'true');
+            }).catch(function(error) {
+                console.log('Autoplay blocked by browser, user interaction required');
+                btn.innerHTML = '🔇 Play Music';
+                localStorage.setItem('musicPlaying', 'false');
             });
         });
     </script>
