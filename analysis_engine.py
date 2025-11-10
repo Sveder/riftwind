@@ -1,6 +1,6 @@
 """
 Analysis Engine for League of Legends Year-in-Review
-Powered by AWS Bedrock (Claude Haiku 4.5)
+Powered by AWS Bedrock (Claude Sonnet 4.5)
 """
 import boto3
 import json
@@ -8,7 +8,7 @@ from datetime import datetime
 from collections import defaultdict, Counter
 
 # AWS Bedrock Configuration
-MODEL_ID = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+MODEL_ID = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 # AWS Bedrock Knowledge Base Configuration
 KNOWLEDGE_BASE_ID = "P8ZJCNHXAV"

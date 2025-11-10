@@ -8,7 +8,6 @@ const game = {
     canvas: null,
     ctx: null,
     mapImage: new Image(),
-    wardImage: new Image(),
     wards: [],
     maxWards: 3,
     minions: [],
@@ -70,11 +69,7 @@ $(document).ready(function() {
         game.ctx.fillText('Map failed to load', MAP_SIZE/2, MAP_SIZE/2);
     };
 
-    // Load ward image
-    game.wardImage.src = '/static/ward.png';
-    game.wardImage.onload = function() {
-        console.log('[WARD GAME] Ward image loaded');
-    };
+    // Ward image not used - vision shown as whitish overlay instead
 
     // Show instructions modal
     const modal = new bootstrap.Modal(document.getElementById('instructionsModal'));
@@ -90,15 +85,22 @@ $(document).ready(function() {
         if (!game.gameStarted) return;
 
         const rect = game.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        // Scale coordinates to match canvas internal size vs display size
+        const scaleX = game.canvas.width / rect.width;
+        const scaleY = game.canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+
+        console.log('[CLICK] Click at', x, y, 'Checking minions:', game.minions.length);
 
         // Check if clicking on a minion first
         const clickedMinion = checkMinionClick(x, y);
         if (clickedMinion) {
+            console.log('[CLICK] Hit minion!');
             lastHitMinion(clickedMinion);
         } else {
             // Otherwise place a ward
+            console.log('[CLICK] Placing ward');
             placeWard(x, y);
         }
     });
@@ -301,45 +303,42 @@ function drawGame() {
     });
     ctx.globalCompositeOperation = 'source-over';
 
-    // Draw white vision circle borders
+    // Draw whitish vision areas
     game.wards.forEach(ward => {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 2;
+        // Create radial gradient for whitish vision area
+        const gradient = ctx.createRadialGradient(ward.x, ward.y, 0, ward.x, ward.y, ward.radius);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        gradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.15)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(ward.x, ward.y, ward.radius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Draw enemy ONLY if spotted (fully hidden otherwise)
+    if (game.enemy.isSpotted) {
+        // Spotted - draw with alert
+        ctx.fillStyle = '#FF4444';
+        ctx.strokeStyle = '#FFFF00';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(game.enemy.x, game.enemy.y, game.enemy.radius, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
-    });
 
-    // Draw ward icons and timers (ABOVE fog and vision circles)
-    game.wards.forEach(ward => {
-        // Draw ward icon image if loaded
-        if (game.wardImage.complete && game.wardImage.naturalWidth > 0) {
-            const iconSize = 24; // Small ward icon
-            ctx.drawImage(game.wardImage, ward.x - iconSize/2, ward.y - iconSize/2, iconSize, iconSize);
-        } else {
-            // Fallback to circle if image not loaded
-            ctx.fillStyle = 'rgba(200, 200, 200, 0.6)';
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(ward.x, ward.y, 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-        }
+        // Alert ring
+        const time = Date.now() / 200;
+        const ringRadius = game.enemy.radius + 5 + Math.sin(time) * 3;
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(game.enemy.x, game.enemy.y, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+    }
 
-        // Timer bar
-        const barWidth = 30;
-        const barHeight = 4;
-        const timePercent = ward.timeRemaining / ward.maxDuration;
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.fillRect(ward.x - barWidth/2, ward.y + 18, barWidth, barHeight);
-
-        ctx.fillStyle = timePercent > 0.3 ? '#CCCCCC' : '#FF6B6B';
-        ctx.fillRect(ward.x - barWidth/2, ward.y + 18, barWidth * timePercent, barHeight);
-    });
-
-    // Draw minions (AFTER fog - so they appear above it)
+    // Draw minions LAST - on top of everything so they're always clickable
     game.minions.forEach(minion => {
         const healthPercent = minion.health / minion.maxHealth;
 
@@ -376,28 +375,6 @@ function drawGame() {
         ctx.lineWidth = 1;
         ctx.strokeRect(minion.x - barWidth/2, minion.y - minion.radius - 8, barWidth, barHeight);
     });
-
-    // Draw enemy ONLY if spotted (fully hidden otherwise)
-    if (game.enemy.isSpotted) {
-        // Spotted - draw with alert
-        ctx.fillStyle = '#FF4444';
-        ctx.strokeStyle = '#FFFF00';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(game.enemy.x, game.enemy.y, game.enemy.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Alert ring
-        const time = Date.now() / 200;
-        const ringRadius = game.enemy.radius + 5 + Math.sin(time) * 3;
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(game.enemy.x, game.enemy.y, ringRadius, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-    // Enemy is NOT drawn when hidden - stays behind fog of war
 }
 
 function updateUI() {
