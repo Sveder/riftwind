@@ -38,9 +38,9 @@ const game = {
 // Constants
 const WARD_VISION_RADIUS = 80;
 const WARD_MIN_DURATION = 10000; // 10 seconds
-const WARD_MAX_DURATION = 30000; // 30 seconds
+const WARD_MAX_DURATION = 20000; // 20 seconds
 const MAP_SIZE = 800;
-const FOG_ALPHA = 0.7;
+const FOG_ALPHA = 0.3;
 const MINION_SPAWN_INTERVAL = 3000; // Spawn minion every 3 seconds
 const MINION_LIFETIME = 15000; // Minions last 15 seconds
 const MINION_HEALTH = 100;
@@ -56,8 +56,18 @@ $(document).ready(function() {
     // Load map image
     game.mapImage.src = '/static/map.jpg';
     game.mapImage.onload = function() {
-        console.log('[WARD GAME] Map loaded');
+        console.log('[WARD GAME] Map loaded successfully');
         drawGame();
+    };
+    game.mapImage.onerror = function() {
+        console.error('[WARD GAME] Failed to load map image from /static/map.jpg');
+        // Draw a placeholder background
+        game.ctx.fillStyle = '#0A1428';
+        game.ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+        game.ctx.fillStyle = '#C79B3B';
+        game.ctx.font = '20px Arial';
+        game.ctx.textAlign = 'center';
+        game.ctx.fillText('Map failed to load', MAP_SIZE/2, MAP_SIZE/2);
     };
 
     // Load ward image
@@ -272,7 +282,35 @@ function drawGame() {
     // Draw map background
     ctx.drawImage(game.mapImage, 0, 0, MAP_SIZE, MAP_SIZE);
 
-    // Draw wards first (under fog)
+    // Draw fog of war
+    ctx.fillStyle = `rgba(0, 0, 0, ${FOG_ALPHA})`;
+    ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+
+    // Cut out vision circles using compositing
+    ctx.globalCompositeOperation = 'destination-out';
+    game.wards.forEach(ward => {
+        const gradient = ctx.createRadialGradient(ward.x, ward.y, 0, ward.x, ward.y, ward.radius);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+        gradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.8)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(ward.x, ward.y, ward.radius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Draw white vision circle borders
+    game.wards.forEach(ward => {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ward.x, ward.y, ward.radius, 0, Math.PI * 2);
+        ctx.stroke();
+    });
+
+    // Draw ward icons and timers (ABOVE fog and vision circles)
     game.wards.forEach(ward => {
         // Draw ward icon image if loaded
         if (game.wardImage.complete && game.wardImage.naturalWidth > 0) {
@@ -300,25 +338,6 @@ function drawGame() {
         ctx.fillStyle = timePercent > 0.3 ? '#CCCCCC' : '#FF6B6B';
         ctx.fillRect(ward.x - barWidth/2, ward.y + 18, barWidth * timePercent, barHeight);
     });
-
-    // Draw fog of war
-    ctx.fillStyle = `rgba(0, 0, 0, ${FOG_ALPHA})`;
-    ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
-
-    // Cut out vision circles using compositing
-    ctx.globalCompositeOperation = 'destination-out';
-    game.wards.forEach(ward => {
-        const gradient = ctx.createRadialGradient(ward.x, ward.y, 0, ward.x, ward.y, ward.radius);
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
-        gradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.8)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(ward.x, ward.y, ward.radius, 0, Math.PI * 2);
-        ctx.fill();
-    });
-    ctx.globalCompositeOperation = 'source-over';
 
     // Draw minions (AFTER fog - so they appear above it)
     game.minions.forEach(minion => {

@@ -237,7 +237,8 @@ function continueToFullAnalysis() {
 // Generate year in review from API
 function generateYearInReview(summonerData) {
     const startTime = Date.now();
-    console.log('[YEAR IN REVIEW] Sending API request...');
+    console.log('[YEAR IN REVIEW] Sending API request with initial matches...');
+    console.log('[YEAR IN REVIEW] Initial matches count:', summonerData.recentMatches.length);
 
     $.ajax({
         url: '/api/year-in-review',
@@ -251,7 +252,7 @@ function generateYearInReview(summonerData) {
         }),
         success: function(data) {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-            console.log(`[YEAR IN REVIEW] ✅ API response received in ${elapsed}s`);
+            console.log(`[YEAR IN REVIEW] ✅ Initial analysis received in ${elapsed}s`);
 
             reviewData = data;
             console.log('[YEAR IN REVIEW] Analysis data:', reviewData.analysis);
@@ -266,6 +267,9 @@ function generateYearInReview(summonerData) {
             buildStoryCards(summonerData, reviewData);
             console.log('[YEAR IN REVIEW] Story cards built successfully!');
 
+            // Show champion recommendations section
+            document.getElementById('championRecsSection').style.display = 'flex';
+
             // Show roast section
             document.getElementById('roastSection').style.display = 'flex';
 
@@ -275,7 +279,15 @@ function generateYearInReview(summonerData) {
             // Initialize scroll animations
             console.log('[YEAR IN REVIEW] Initializing scroll animations...');
             initScrollAnimations();
-            console.log('[YEAR IN REVIEW] ✨ Year in review complete!');
+            console.log('[YEAR IN REVIEW] ✨ Initial review complete!');
+
+            // Trigger background fetch for full data (500 matches) only if we have less than 500
+            if (summonerData.recentMatches.length < 500) {
+                console.log(`[YEAR IN REVIEW] Have ${summonerData.recentMatches.length} matches, fetching more...`);
+                triggerFullDataFetch(summonerData);
+            } else {
+                console.log(`[YEAR IN REVIEW] Already have ${summonerData.recentMatches.length} matches, skipping background fetch`);
+            }
         },
         error: function(xhr) {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -294,6 +306,144 @@ function generateYearInReview(summonerData) {
                     </div>
                 </div>
             `;
+        }
+    });
+}
+
+// Trigger background fetch for full data (500 matches)
+function triggerFullDataFetch(summonerData) {
+    console.log('[FULL DATA] Starting background fetch for additional matches...');
+
+    // Show a prominent notification at top-right
+    const notification = document.createElement('div');
+    notification.id = 'backgroundLoadNotification';
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(30, 35, 40, 0.98);
+        border: 3px solid #C79B3B;
+        border-radius: 15px;
+        padding: 20px 30px;
+        color: #E4E1D8;
+        font-size: 1.1rem;
+        z-index: 9999;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+        min-width: 320px;
+    `;
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="spinner" style="width: 30px; height: 30px; border-width: 3px;"></div>
+            <span style="font-weight: 600;">Loading full match history...</span>
+        </div>
+    `;
+    document.body.appendChild(notification);
+
+    const [gameName, tagLine] = summonerData.summoner.name.split('#');
+
+    $.ajax({
+        url: '/api/summoner/full',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            gameName: gameName,
+            tagLine: tagLine,
+            region: summonerData.region
+        }),
+        success: function(fullData) {
+            console.log(`[FULL DATA] ✅ Full data received: ${fullData.total_matches} matches`);
+
+            // Update notification
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span style="color: #3BC77B; font-size: 1.5rem;">✓</span>
+                    <span style="font-weight: 600;">Loaded ${fullData.total_matches} total matches! Refreshing analysis...</span>
+                </div>
+            `;
+
+            // Merge new matches with existing data
+            summonerData.recentMatches = fullData.matches;
+
+            // Save updated data to IndexedDB
+            saveToIndexedDB('summonerData', summonerData).then(() => {
+                console.log('[FULL DATA] Updated data saved to IndexedDB');
+            });
+
+            // Re-generate analysis with full data
+            setTimeout(() => {
+                // Update notification to show we're analyzing
+                notification.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="spinner" style="width: 30px; height: 30px; border-width: 3px;"></div>
+                        <span style="font-weight: 600;">Re-analyzing with ${fullData.total_matches} matches...</span>
+                    </div>
+                `;
+
+                // Re-run analysis
+                $.ajax({
+                    url: '/api/year-in-review',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        matches: summonerData.recentMatches,
+                        summonerName: summonerData.summoner.name,
+                        region: summonerData.region,
+                        timelines: summonerData.matchTimelines || []
+                    }),
+                    success: function(data) {
+                        console.log('[FULL DATA] ✅ Full analysis complete!');
+                        reviewData = data;
+
+                        // Remove notification
+                        notification.style.opacity = '0';
+                        setTimeout(() => notification.remove(), 500);
+
+                        // Rebuild story cards with updated data
+                        buildStoryCards(summonerData, reviewData);
+
+                        // Ensure sections are visible
+                        document.getElementById('championRecsSection').style.display = 'flex';
+                        document.getElementById('roastSection').style.display = 'flex';
+                        document.getElementById('shareSection').style.display = 'flex';
+
+                        // Re-initialize scroll animations
+                        initScrollAnimations();
+
+                        // Scroll to top to see updated content
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    },
+                    error: function(xhr) {
+                        console.error('[FULL DATA] Error re-analyzing:', xhr);
+
+                        // Show error in notification
+                        notification.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <span style="color: #C73B3B; font-size: 1.5rem;">✗</span>
+                                <span style="font-weight: 600;">Error updating analysis. Showing initial results.</span>
+                            </div>
+                        `;
+
+                        // Remove notification after 3 seconds
+                        setTimeout(() => {
+                            notification.style.opacity = '0';
+                            setTimeout(() => notification.remove(), 500);
+                        }, 3000);
+                    }
+                });
+            }, 2000);
+        },
+        error: function(xhr) {
+            console.error('[FULL DATA] ❌ Error fetching full data:', xhr);
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span style="color: #C73B3B; font-size: 1.5rem;">✗</span>
+                    <span style="font-weight: 600;">Could not load full history. Analysis based on ${summonerData.recentMatches.length} matches.</span>
+                </div>
+            `;
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
         }
     });
 }
@@ -1283,18 +1433,217 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
+    // NEW INSIGHTS CARDS
+
+    // Card 21: Comeback Potential
+    if (analysis.comeback_potential && analysis.comeback_potential.total_deficit_games > 0) {
+        const comeback = analysis.comeback_potential;
+        const comebackColor = comeback.comeback_rate >= 40 ? '#3BC77B' : comeback.comeback_rate >= 25 ? '#C79B3B' : '#C73B3B';
+
+        cards.push(`
+            <div class="story-card">
+                <h2>👑 Comeback King Score</h2>
+                <div class="stat-number" style="color: ${comebackColor};">${comeback.comeback_score}</div>
+                <p style="font-size: 1.3rem; margin-bottom: 20px;">Resilience Rating</p>
+
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 10px;">
+                        When Behind at 15 Minutes:
+                    </p>
+                    <div style="display: flex; justify-content: space-around; margin-top: 15px;">
+                        <div style="text-align: center;">
+                            <p style="color: #C79B3B; font-size: 2rem; font-weight: bold; margin: 0;">${comeback.comeback_games}</p>
+                            <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 5px;">Comeback Wins</p>
+                        </div>
+                        <div style="text-align: center;">
+                            <p style="color: ${comebackColor}; font-size: 2rem; font-weight: bold; margin: 0;">${comeback.comeback_rate}%</p>
+                            <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 5px;">Success Rate</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: ${comeback.comeback_rate >= 40 ? 'rgba(59, 199, 123, 0.1)' : 'rgba(199, 155, 59, 0.1)'}; border-radius: 10px; padding: 15px; border-left: 3px solid ${comebackColor};">
+                    <p style="color: ${comebackColor}; font-size: 1.1rem; margin: 0; font-weight: bold;">
+                        ${comeback.comeback_rate >= 40 ? '🔥 Never Give Up Attitude!' : comeback.comeback_rate >= 25 ? '💪 Solid Mental Game' : '📈 Room to Improve'}
+                    </p>
+                    <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
+                        ${comeback.comeback_rate >= 40 ?
+                            'You thrive under pressure and turn deficits into victories!' :
+                            comeback.comeback_rate >= 25 ?
+                            'You stay competitive even when behind - keep fighting!' :
+                            'Focus on playing safer when behind and look for comeback opportunities'}
+                    </p>
+                </div>
+            </div>
+        `);
+    }
+
+    // Card 22: Power Spikes
+    if (analysis.power_spikes) {
+        const spikes = analysis.power_spikes;
+        const phaseEmojis = {early: '🌅', mid: '⚔️', late: '🌙'};
+        const phaseNames = {early: 'Early Game', mid: 'Mid Game', late: 'Late Game'};
+
+        cards.push(`
+            <div class="story-card">
+                <h2>⚡ Power Spike Analysis</h2>
+                <div class="stat-number">${phaseEmojis[spikes.best_phase]} ${phaseNames[spikes.best_phase]}</div>
+                <p style="font-size: 1.3rem; margin-bottom: 20px;">Your Strongest Phase</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
+                    ${['early', 'mid', 'late'].map(phase => {
+                        const isBest = phase === spikes.best_phase;
+                        return `
+                            <div style="background: ${isBest ? 'rgba(199, 155, 59, 0.2)' : 'rgba(255, 255, 255, 0.05)'}; padding: 15px; border-radius: 10px; border: ${isBest ? '2px solid #C79B3B' : 'none'};">
+                                <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">${phaseEmojis[phase]} ${phaseNames[phase]}</p>
+                                <p style="color: ${isBest ? '#C79B3B' : '#E4E1D8'}; font-size: 1.8rem; font-weight: bold; margin: 0;">${spikes.phase_stats[phase].kda.toFixed(2)}</p>
+                                <p style="color: #A09B8C; font-size: 0.7rem; margin-top: 3px;">KDA</p>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+
+                <div style="background: rgba(199, 155, 59, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #C79B3B;">
+                    <p style="color: #C79B3B; font-size: 1.1rem; margin: 0; font-weight: bold;">
+                        💡 Strategy Tip
+                    </p>
+                    <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
+                        ${spikes.best_phase === 'early' ?
+                            'You excel in early game! Pick aggressive champions and snowball your lead.' :
+                            spikes.best_phase === 'mid' ?
+                            'Mid game is your sweet spot! Focus on team fights and objective control.' :
+                            'You shine in late game! Play safe early and scale into a monster.'}
+                    </p>
+                </div>
+            </div>
+        `);
+    }
+
+    // Card 23: Objective Priority
+    if (analysis.objective_priority) {
+        const obj = analysis.objective_priority;
+        const impactColor = obj.objective_impact > 10 ? '#3BC77B' : obj.objective_impact > 0 ? '#C79B3B' : '#C73B3B';
+
+        cards.push(`
+            <div class="story-card">
+                <h2>🐉 Objective Mastery</h2>
+                <div class="stat-number" style="color: ${impactColor};">+${Math.abs(obj.objective_impact)}%</div>
+                <p style="font-size: 1.3rem; margin-bottom: 20px;">Win Rate Impact</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; text-align: center;">
+                        <p style="color: #9966FF; font-size: 3rem; margin: 0;">🐉</p>
+                        <p style="color: #E4E1D8; font-size: 1.8rem; font-weight: bold; margin: 10px 0;">${obj.avg_dragons_per_game}</p>
+                        <p style="color: #A09B8C; font-size: 0.9rem;">Dragons/Game</p>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; text-align: center;">
+                        <p style="color: #7B68EE; font-size: 3rem; margin: 0;">👑</p>
+                        <p style="color: #E4E1D8; font-size: 1.8rem; font-weight: bold; margin: 10px 0;">${obj.avg_barons_per_game}</p>
+                        <p style="color: #A09B8C; font-size: 0.9rem;">Barons/Game</p>
+                    </div>
+                </div>
+
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <p style="color: #A09B8C; font-size: 0.9rem; margin: 0;">With 2+ Objectives:</p>
+                        <p style="color: #3BC77B; font-size: 1.5rem; font-weight: bold; margin: 0;">${obj.high_obj_winrate}%</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.9rem; margin: 0;">Overall Win Rate:</p>
+                        <p style="color: #E4E1D8; font-size: 1.5rem; font-weight: bold; margin: 0;">${obj.overall_winrate}%</p>
+                    </div>
+                </div>
+
+                <div style="background: ${obj.is_objective_focused ? 'rgba(59, 199, 123, 0.1)' : 'rgba(199, 155, 59, 0.1)'}; border-radius: 10px; padding: 15px; border-left: 3px solid ${impactColor};">
+                    <p style="color: ${impactColor}; font-size: 1.1rem; margin: 0; font-weight: bold;">
+                        ${obj.is_objective_focused ? '🎯 Macro God!' : '💡 Focus More on Objectives'}
+                    </p>
+                    <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
+                        ${obj.is_objective_focused ?
+                            'Objectives significantly boost your win rate - keep prioritizing them!' :
+                            'Try focusing more on dragons and barons to increase your win rate!'}
+                    </p>
+                </div>
+            </div>
+        `);
+    }
+
+    // Card 24: Tilt Factor (Mental Fortitude)
+    if (analysis.tilt_factor) {
+        const tilt = analysis.tilt_factor;
+        const fortitudeColors = {
+            'Unshakeable': '#3BC77B',
+            'Strong': '#4CAF50',
+            'Average': '#C79B3B',
+            'Needs Work': '#C73B3B'
+        };
+        const fortitudeColor = fortitudeColors[tilt.mental_fortitude] || '#C79B3B';
+
+        cards.push(`
+            <div class="story-card">
+                <h2>🧠 Mental Fortitude</h2>
+                <div class="stat-number" style="color: ${fortitudeColor};">${tilt.tilt_score}</div>
+                <p style="font-size: 1.3rem; margin-bottom: 10px;">Tilt Resistance Score</p>
+                <p style="color: ${fortitudeColor}; font-size: 1.5rem; font-weight: bold; margin-bottom: 20px;">${tilt.mental_fortitude}</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">After Wins</p>
+                        <p style="color: #3BC77B; font-size: 1.8rem; font-weight: bold; margin: 0;">${tilt.after_win_kda}</p>
+                        <p style="color: #A09B8C; font-size: 0.7rem; margin-top: 3px;">Avg KDA</p>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">After Losses</p>
+                        <p style="color: ${tilt.kda_drop_after_loss > 1 ? '#C73B3B' : '#C79B3B'}; font-size: 1.8rem; font-weight: bold; margin: 0;">${tilt.after_loss_kda}</p>
+                        <p style="color: #A09B8C; font-size: 0.7rem; margin-top: 3px;">Avg KDA</p>
+                    </div>
+                </div>
+
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <p style="color: #A09B8C; font-size: 0.9rem;">Longest Loss Streak:</p>
+                        <p style="color: #E4E1D8; font-size: 1.2rem; font-weight: bold;">${tilt.max_loss_streak} games</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <p style="color: #A09B8C; font-size: 0.9rem;">Win Rate After Loss:</p>
+                        <p style="color: ${tilt.after_loss_winrate >= 45 ? '#3BC77B' : '#C73B3B'}; font-size: 1.2rem; font-weight: bold;">${tilt.after_loss_winrate}%</p>
+                    </div>
+                </div>
+
+                <div style="background: ${tilt.tilt_score > 60 ? 'rgba(59, 199, 123, 0.1)' : 'rgba(199, 155, 59, 0.1)'}; border-radius: 10px; padding: 15px; border-left: 3px solid ${fortitudeColor};">
+                    <p style="color: ${fortitudeColor}; font-size: 1.1rem; margin: 0; font-weight: bold;">
+                        ${tilt.mental_fortitude === 'Unshakeable' ? '🛡️ Iron Mental!' :
+                          tilt.mental_fortitude === 'Strong' ? '💪 Solid Mindset' :
+                          tilt.mental_fortitude === 'Average' ? '⚖️ Balanced' : '⚠️ Watch for Tilt'}
+                    </p>
+                    <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
+                        ${tilt.kda_drop_after_loss > 1.5 ?
+                            `Your KDA drops ${tilt.kda_drop_after_loss.toFixed(1)} points after losses. Take breaks to reset!` :
+                            tilt.kda_drop_after_loss > 0.5 ?
+                            'You maintain decent performance after losses - good mental!' :
+                            'Amazing mental! You actually perform better after losses.'}
+                    </p>
+                </div>
+            </div>
+        `);
+    }
+
     // Add all cards to container (prepend before roast/share sections)
     console.log('[BUILD CARDS] Total cards built:', cards.length);
     console.log('[BUILD CARDS] Inserting cards into DOM...');
 
-    // Get existing roast and share sections
+    // Get existing special sections
+    const championRecsSection = document.getElementById('championRecsSection');
     const roastSection = document.getElementById('roastSection');
     const shareSection = document.getElementById('shareSection');
 
     // Clear container and add cards
     container.innerHTML = cards.join('');
 
-    // Re-append roast and share sections at the end
+    // Re-append special sections at the end in order
+    if (championRecsSection) {
+        container.appendChild(championRecsSection);
+    }
     if (roastSection) {
         container.appendChild(roastSection);
     }
@@ -1364,18 +1713,8 @@ async function getRoasted() {
         success: function(data) {
             console.log('[ROAST] ✅ Roast received:', data.roast);
 
-            // Convert markdown to HTML
-            let formattedRoast = data.roast
-                // Bold
-                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                // Italic
-                .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                // Line breaks
-                .replace(/\n/g, '<br>')
-                // Bullet points
-                .replace(/^- (.+)$/gm, '<li>$1</li>')
-                // Wrap lists
-                .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+            // Convert markdown to HTML using the formatMarkdown function
+            const formattedRoast = formatMarkdown(data.roast);
 
             document.getElementById('roastText').innerHTML = formattedRoast;
 
@@ -1392,28 +1731,224 @@ async function getRoasted() {
     });
 }
 
+// Champion recommendations function
+async function getChampionRecommendations() {
+    const summonerData = await getFromIndexedDB('summonerData');
+    if (!summonerData || !summonerData.recentMatches) {
+        console.error('[CHAMPION RECS] No summoner data found');
+        return;
+    }
+
+    const button = document.querySelector('#championRecsSection .roast-button');
+    const contentDiv = document.getElementById('championRecsContent');
+
+    // Show loading state
+    button.disabled = true;
+    button.textContent = 'Analyzing your playstyle...';
+
+    $.ajax({
+        url: '/api/recommend-champions',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            matches: summonerData.recentMatches,
+            summonerName: summonerData.summoner.name,
+            region: summonerData.region
+        }),
+        success: function(data) {
+            console.log('[CHAMPION RECS] ✅ Recommendations received:', data.recommendations);
+
+            if (data.recommendations && data.recommendations.length > 0) {
+                let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px;">';
+
+                data.recommendations.forEach((rec, index) => {
+                    html += `
+                        <div style="
+                            background: linear-gradient(135deg, #1E2328 0%, #0A1428 100%);
+                            border: 3px solid #C79B3B;
+                            border-radius: 20px;
+                            padding: 30px;
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 15px 40px rgba(199, 155, 59, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                            <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                                <img src="https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/${rec.champion.replace(/[^a-zA-Z]/g, '')}.png"
+                                     style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid #C79B3B; margin-right: 20px;"
+                                     onerror="this.src='https://via.placeholder.com/80?text=${rec.champion}'">
+                                <div>
+                                    <h3 style="color: #C79B3B; font-size: 2rem; margin: 0;">${rec.champion}</h3>
+                                    <p style="color: #A09B8C; margin: 5px 0 0 0; font-size: 1.1rem;">${rec.role}</p>
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 20px;">
+                                <h4 style="color: #D4AF37; font-size: 1.2rem; margin-bottom: 10px;">Why This Champion?</h4>
+                                <p style="color: #E4E1D8; line-height: 1.6; font-size: 1rem;">${rec.reason}</p>
+                            </div>
+
+                            <div style="margin-bottom: 25px;">
+                                <h4 style="color: #D4AF37; font-size: 1.2rem; margin-bottom: 10px;">Key Strength</h4>
+                                <p style="color: #3BC77B; line-height: 1.6; font-size: 1rem; font-weight: bold;">${rec.strength}</p>
+                            </div>
+
+                            <a href="${rec.opgg_url}" target="_blank" style="
+                                display: inline-block;
+                                background: linear-gradient(135deg, #C79B3B 0%, #D4AF37 100%);
+                                color: #0A1428;
+                                padding: 12px 30px;
+                                border-radius: 25px;
+                                text-decoration: none;
+                                font-weight: bold;
+                                font-size: 1.1rem;
+                                transition: all 0.3s ease;
+                            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                📊 View Build on OP.GG
+                            </a>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+                contentDiv.innerHTML = html;
+                contentDiv.style.display = 'block';
+
+                // Update button
+                button.textContent = 'Get New Recommendations';
+                button.disabled = false;
+            } else {
+                contentDiv.innerHTML = '<p style="color: #A09B8C; font-size: 1.2rem;">Could not generate recommendations. Try again!</p>';
+                contentDiv.style.display = 'block';
+                button.textContent = 'Try Again';
+                button.disabled = false;
+            }
+        },
+        error: function(xhr) {
+            console.error('[CHAMPION RECS] ❌ Failed to get recommendations:', xhr);
+            contentDiv.innerHTML = '<p style="color: #C73B3B; font-size: 1.2rem;">Failed to generate recommendations. Please try again!</p>';
+            contentDiv.style.display = 'block';
+            button.textContent = 'Try Again';
+            button.disabled = false;
+        }
+    });
+}
+
 // Social sharing functions
 async function shareToTwitter() {
     const summonerData = await getFromIndexedDB('summonerData');
-    const summonerName = summonerData?.summoner?.name || 'My';
-    const text = `Check out ${summonerName} League of Legends 2025 Year in Review! 🎮✨`;
-    const url = window.location.href;
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+    const summonerName = summonerData?.summoner?.name?.split('#')[0] || 'Unknown';
+    const tagLine = summonerData?.summoner?.name?.split('#')[1] || '';
+    const region = summonerData?.region || 'na1';
+
+    // Calculate actual stats from matches
+    const matches = summonerData?.recentMatches || [];
+    const totalGames = reviewData?.total_matches || matches.length || 0;
+    const wins = matches.filter(m => m.win).length;
+    const winRate = totalGames > 0 ? ((wins / totalGames) * 100).toFixed(1) : 0;
+
+    // Get top champion from analysis or calculate it
+    let topChamp = 'various champions';
+    if (reviewData?.analysis?.champion_diversity?.top_3_champions?.[0]) {
+        topChamp = reviewData.analysis.champion_diversity.top_3_champions[0].name;
+    } else if (matches.length > 0) {
+        // Calculate from matches
+        const championCounts = {};
+        matches.forEach(m => {
+            const champ = m.championName;
+            championCounts[champ] = (championCounts[champ] || 0) + 1;
+        });
+        const sortedChamps = Object.entries(championCounts).sort((a, b) => b[1] - a[1]);
+        if (sortedChamps.length > 0) {
+            topChamp = sortedChamps[0][0];
+        }
+    }
+
+    // Create engaging message with stats
+    const text = `Just checked out my League of Legends 2025 Year in Review on Riftwind! 🎮\n\n${totalGames} games played • ${winRate}% win rate • Main: ${topChamp}\n\nSee your own stats:`;
+
+    // Build URL with user parameters
+    const shareUrl = `${window.location.origin}/year-in-review?summoner=${encodeURIComponent(summonerName)}&tag=${encodeURIComponent(tagLine)}&region=${encodeURIComponent(region)}`;
+
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
     window.open(twitterUrl, '_blank', 'width=600,height=400');
 }
 
-function shareToFacebook() {
-    const url = window.location.href;
-    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-    window.open(facebookUrl, '_blank', 'width=600,height=400');
+async function shareToFacebook() {
+    const summonerData = await getFromIndexedDB('summonerData');
+    const summonerName = summonerData?.summoner?.name?.split('#')[0] || 'Unknown';
+    const tagLine = summonerData?.summoner?.name?.split('#')[1] || '';
+    const region = summonerData?.region || 'na1';
+
+    // Calculate actual stats from matches
+    const matches = summonerData?.recentMatches || [];
+    const totalGames = reviewData?.total_matches || matches.length || 0;
+    const wins = matches.filter(m => m.win).length;
+    const winRate = totalGames > 0 ? ((wins / totalGames) * 100).toFixed(1) : 0;
+
+    // Get top champion from analysis or calculate it
+    let topChamp = 'various champions';
+    if (reviewData?.analysis?.champion_diversity?.top_3_champions?.[0]) {
+        topChamp = reviewData.analysis.champion_diversity.top_3_champions[0].name;
+    } else if (matches.length > 0) {
+        // Calculate from matches
+        const championCounts = {};
+        matches.forEach(m => {
+            const champ = m.championName;
+            championCounts[champ] = (championCounts[champ] || 0) + 1;
+        });
+        const sortedChamps = Object.entries(championCounts).sort((a, b) => b[1] - a[1]);
+        if (sortedChamps.length > 0) {
+            topChamp = sortedChamps[0][0];
+        }
+    }
+
+    // Build URL with user parameters and stats as hash parameters (will show in preview)
+    const shareUrl = `${window.location.origin}/year-in-review?summoner=${encodeURIComponent(summonerName)}&tag=${encodeURIComponent(tagLine)}&region=${encodeURIComponent(region)}`;
+
+    // Facebook Feed Dialog allows for more customization
+    const text = `Just checked out my League of Legends 2025 Year in Review on Riftwind! ${totalGames} games played • ${winRate}% win rate • Main: ${topChamp}`;
+    const facebookUrl = `https://www.facebook.com/dialog/feed?app_id=YOUR_APP_ID&link=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(text)}&display=popup&redirect_uri=${encodeURIComponent(shareUrl)}`;
+
+    // Fallback to simple sharer (doesn't support quote but is more reliable)
+    const simpleFacebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+
+    window.open(simpleFacebookUrl, '_blank', 'width=600,height=400');
 }
 
 async function shareToBluesky() {
     const summonerData = await getFromIndexedDB('summonerData');
-    const summonerName = summonerData?.summoner?.name || 'My';
-    const text = `Check out ${summonerName} League of Legends 2025 Year in Review! 🎮✨`;
-    const url = window.location.href;
-    const blueskyUrl = `https://bsky.app/intent/compose?text=${encodeURIComponent(text + '\n' + url)}`;
+    const summonerName = summonerData?.summoner?.name?.split('#')[0] || 'Unknown';
+    const tagLine = summonerData?.summoner?.name?.split('#')[1] || '';
+    const region = summonerData?.region || 'na1';
+
+    // Calculate actual stats from matches
+    const matches = summonerData?.recentMatches || [];
+    const totalGames = reviewData?.total_matches || matches.length || 0;
+    const wins = matches.filter(m => m.win).length;
+    const winRate = totalGames > 0 ? ((wins / totalGames) * 100).toFixed(1) : 0;
+
+    // Get top champion from analysis or calculate it
+    let topChamp = 'various champions';
+    if (reviewData?.analysis?.champion_diversity?.top_3_champions?.[0]) {
+        topChamp = reviewData.analysis.champion_diversity.top_3_champions[0].name;
+    } else if (matches.length > 0) {
+        // Calculate from matches
+        const championCounts = {};
+        matches.forEach(m => {
+            const champ = m.championName;
+            championCounts[champ] = (championCounts[champ] || 0) + 1;
+        });
+        const sortedChamps = Object.entries(championCounts).sort((a, b) => b[1] - a[1]);
+        if (sortedChamps.length > 0) {
+            topChamp = sortedChamps[0][0];
+        }
+    }
+
+    // Create engaging message with stats
+    const text = `Just checked out my League of Legends 2025 Year in Review on Riftwind! 🎮\n\n${totalGames} games played • ${winRate}% win rate • Main: ${topChamp}\n\nSee your own stats:`;
+
+    // Build URL with user parameters
+    const shareUrl = `${window.location.origin}/year-in-review?summoner=${encodeURIComponent(summonerName)}&tag=${encodeURIComponent(tagLine)}&region=${encodeURIComponent(region)}`;
+
+    const blueskyUrl = `https://bsky.app/intent/compose?text=${encodeURIComponent(text + '\n' + shareUrl)}`;
     window.open(blueskyUrl, '_blank', 'width=600,height=400');
 }
 

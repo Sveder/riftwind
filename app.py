@@ -246,10 +246,10 @@ Timestamp: {search_time}
         start_2025 = int(datetime(2025, 1, 1).timestamp())
         end_2025 = int(datetime(2025, 12, 31, 23, 59, 59).timestamp())
 
-        # Fetch matches in batches (max 100 per request, fetch up to 100 total)
+        # Fetch matches in batches (max 100 per request, fetch up to 400 total)
         match_ids = []
         matches_per_batch = 100
-        max_matches = 100
+        max_matches = 400
 
         for start_index in range(0, max_matches, matches_per_batch):
             match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?startTime={start_2025}&endTime={end_2025}&start={start_index}&count={matches_per_batch}'
@@ -258,14 +258,19 @@ Timestamp: {search_time}
             # Try cache first
             match_ids_batch = cached_request(match_url, headers)
             if match_ids_batch is None:
+                # Add sleep before making API request to avoid rate limits
+                if start_index > 0:
+                    print(f"[MATCH API] Sleeping 1.5 seconds to avoid rate limit...")
+                    time.sleep(1.5)
+
                 match_response = requests.get(match_url, headers=headers, timeout=30)
                 print(f"[MATCH API] Status Code: {match_response.status_code}")
 
                 if match_response.status_code == 200:
                     match_ids_batch = match_response.json()
                 elif match_response.status_code == 429:
-                    print(f"[MATCH API] Rate limited (429), sleeping for 2 seconds...")
-                    time.sleep(2)
+                    print(f"[MATCH API] Rate limited (429), sleeping for 3 seconds...")
+                    time.sleep(3)
                     # Retry once after rate limit
                     match_response = requests.get(match_url, headers=headers, timeout=30)
                     if match_response.status_code == 200:
@@ -291,10 +296,14 @@ Timestamp: {search_time}
         total_games = len(match_ids)
         print(f"[MATCH API] Retrieved {total_games} total match IDs from 2025")
 
-        # Step 5: Get detailed match data - fetch 1000 for comprehensive analysis
+        # Step 5: Get detailed match data - fetch up to 75 for initial load (quick response)
         match_details = []
-        matches_to_fetch = match_ids[:1000]
-        print(f"[MATCH DETAILS] Fetching details for {len(matches_to_fetch)} matches")
+        matches_to_fetch = match_ids[:75]
+        print(f"[MATCH DETAILS] Fetching details for {len(matches_to_fetch)} matches (initial batch)")
+
+        # Track first and last match dates
+        first_match_date = None
+        last_match_date = None
 
         for i, match_id in enumerate(matches_to_fetch):
             match_detail_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{match_id}'
@@ -303,13 +312,18 @@ Timestamp: {search_time}
             # Try cache first
             match_data = cached_request(match_detail_url, headers)
             if match_data is None:
+                # Add sleep before making API request to avoid rate limits
+                if i > 0 and i % 10 == 0:  # Sleep every 10 requests
+                    print(f"[MATCH DETAILS] Sleeping 1.5 seconds to avoid rate limit...")
+                    time.sleep(1.5)
+
                 detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
                 if detail_response.status_code == 200:
                     match_data = detail_response.json()
                     print(f"[MATCH DETAILS] Successfully fetched match {match_id}")
                 elif detail_response.status_code == 429:
-                    print(f"[MATCH DETAILS] Rate limited (429) on match {match_id}, sleeping for 2 seconds...")
-                    time.sleep(2)
+                    print(f"[MATCH DETAILS] Rate limited (429) on match {match_id}, sleeping for 3 seconds...")
+                    time.sleep(3)
                     # Retry once after rate limit
                     detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
                     if detail_response.status_code == 200:
@@ -323,15 +337,34 @@ Timestamp: {search_time}
                     continue
 
             if match_data:
+                # Check if match is from 2024 or earlier
+                game_creation_ms = match_data['info']['gameCreation']
+                match_date = datetime.fromtimestamp(game_creation_ms / 1000)
+
+                if match_date.year < 2025:
+                    print(f"[MATCH DETAILS] Reached 2024 match (date: {match_date.strftime('%Y-%m-%d %H:%M:%S')}), stopping fetch")
+                    break
+
+                # Track date range
+                if first_match_date is None:
+                    first_match_date = match_date
+                last_match_date = match_date
+
                 match_details.append(match_data)
 
         print(f"[MATCH DETAILS] Total matches fetched: {len(match_details)}")
 
+        # Display match date range
+        if first_match_date and last_match_date:
+            print(f"[MATCH DATE RANGE] First match: {first_match_date.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"[MATCH DATE RANGE] Last match: {last_match_date.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"[MATCH DATE RANGE] Total span: {(first_match_date - last_match_date).days} days")
+
         # Step 6: Get timeline data for multiple matches (for kill steal analysis)
         match_timelines = []
-        timeline_fetch_limit = min(15, len(match_ids))  # Fetch up to 15 timelines
+        timeline_fetch_limit = min(10, len(match_ids))  # Fetch up to 10 timelines for initial load
 
-        print(f"[TIMELINE] Fetching timelines for {timeline_fetch_limit} matches...")
+        print(f"[TIMELINE] Fetching timelines for {timeline_fetch_limit} matches (initial batch)...")
         for i, match_id in enumerate(match_ids[:timeline_fetch_limit]):
             timeline_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{match_id}/timeline'
 
@@ -548,6 +581,251 @@ Timestamp: {search_time}
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/summoner/full', methods=['POST'])
+def get_summoner_full_data():
+    """Fetch full match data (500 matches) with proper rate limiting - called after initial 75"""
+    print(f"[FULL DATA] Starting full data fetch...")
+    try:
+        data = request.json
+        game_name = data.get('gameName')
+        tag_line = data.get('tagLine')
+        region = data.get('region', 'na1').lower()
+
+        if not game_name or not tag_line:
+            return jsonify({'error': 'Game name and tag line are required'}), 400
+
+        # Get regional routing
+        routing_value = REGION_ROUTING.get(region, 'americas')
+
+        # Step 1: Get PUUID from Riot ID (use cache)
+        account_url = f'https://{routing_value}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{game_name}/{tag_line}'
+        headers = {'X-Riot-Token': RIOT_API_KEY}
+
+        cache_key = get_cache_key(account_url, headers)
+        account_data = get_from_cache(cache_key)
+
+        if not account_data:
+            account_response = requests.get(account_url, headers=headers, timeout=30)
+            if account_response.status_code != 200:
+                return jsonify({'error': f'Failed to find summoner: {account_response.status_code}'}), 400
+            account_data = account_response.json()
+            save_to_cache(cache_key, account_data)
+
+        puuid = account_data['puuid']
+        print(f"[FULL DATA] PUUID: {puuid}")
+
+        # Step 2: Get match IDs for 2025
+        start_2025 = int(datetime(2025, 1, 1).timestamp())
+        end_2025 = int(datetime(2025, 12, 31, 23, 59, 59).timestamp())
+
+        match_ids = []
+        matches_per_batch = 100
+        max_matches = 500  # Fetch up to 500 total
+
+        for start_index in range(0, max_matches, matches_per_batch):
+            match_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?startTime={start_2025}&endTime={end_2025}&start={start_index}&count={matches_per_batch}'
+            print(f"[FULL DATA] Fetching batch starting at {start_index}")
+
+            match_ids_batch = cached_request(match_url, headers)
+            if match_ids_batch is None:
+                if start_index > 0:
+                    time.sleep(1.5)
+                match_response = requests.get(match_url, headers=headers, timeout=30)
+                if match_response.status_code == 200:
+                    match_ids_batch = match_response.json()
+                elif match_response.status_code == 429:
+                    time.sleep(3)
+                    match_response = requests.get(match_url, headers=headers, timeout=30)
+                    if match_response.status_code == 200:
+                        match_ids_batch = match_response.json()
+                    else:
+                        return jsonify({'error': 'Rate limited'}), 429
+                else:
+                    break
+
+            if not match_ids_batch or len(match_ids_batch) == 0:
+                break
+
+            match_ids.extend(match_ids_batch)
+            if len(match_ids_batch) < matches_per_batch:
+                break
+
+        print(f"[FULL DATA] Retrieved {len(match_ids)} total match IDs")
+
+        # Step 3: Fetch all 500 match details with smart rate limiting
+        match_details = []
+        matches_to_fetch = match_ids[:500]
+
+        print(f"[FULL DATA] Fetching {len(matches_to_fetch)} match details with rate limiting...")
+
+        # Rate limit strategy: 20 req/sec, 100 req/2min
+        # Safe approach: 15 requests per second with pauses
+        requests_in_batch = 0
+        batch_start_time = time.time()
+
+        for i, match_id in enumerate(matches_to_fetch):
+            match_detail_url = f'https://{routing_value}.api.riotgames.com/lol/match/v5/matches/{match_id}'
+
+            # Try cache first
+            match_data = cached_request(match_detail_url, headers)
+            if match_data is None:
+                # Rate limiting logic
+                requests_in_batch += 1
+
+                # Every 15 requests, ensure we haven't exceeded 1 second
+                if requests_in_batch >= 15:
+                    elapsed = time.time() - batch_start_time
+                    if elapsed < 1.0:
+                        sleep_time = 1.0 - elapsed
+                        print(f"[FULL DATA] Rate limit pause: {sleep_time:.2f}s")
+                        time.sleep(sleep_time)
+                    requests_in_batch = 0
+                    batch_start_time = time.time()
+
+                # Every 90 requests, take a longer pause (2min limit)
+                if i > 0 and i % 90 == 0:
+                    print(f"[FULL DATA] Long pause to respect 100/2min limit...")
+                    time.sleep(5)
+
+                detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
+                if detail_response.status_code == 200:
+                    match_data = detail_response.json()
+                    save_to_cache(get_cache_key(match_detail_url, headers), match_data)
+                elif detail_response.status_code == 429:
+                    print(f"[FULL DATA] Rate limited, sleeping 5 seconds...")
+                    time.sleep(5)
+                    detail_response = requests.get(match_detail_url, headers=headers, timeout=30)
+                    if detail_response.status_code == 200:
+                        match_data = detail_response.json()
+                        save_to_cache(get_cache_key(match_detail_url, headers), match_data)
+                    else:
+                        print(f"[FULL DATA] Still rate limited, stopping at {i} matches")
+                        break
+                else:
+                    continue
+
+            if match_data:
+                # Check if match is from 2024 or earlier
+                game_creation_ms = match_data['info']['gameCreation']
+                match_date = datetime.fromtimestamp(game_creation_ms / 1000)
+                if match_date.year < 2025:
+                    print(f"[FULL DATA] Reached 2024 match, stopping")
+                    break
+                match_details.append(match_data)
+
+            # Progress logging every 50 matches
+            if (i + 1) % 50 == 0:
+                print(f"[FULL DATA] Progress: {i + 1}/{len(matches_to_fetch)} matches fetched")
+
+        print(f"[FULL DATA] Total matches fetched: {len(match_details)}")
+
+        # Process matches (same as original endpoint)
+        processed_matches = []
+        for match in match_details:
+            participant = None
+            player_team_id = None
+            for p in match['info']['participants']:
+                if p['puuid'] == puuid:
+                    participant = p
+                    player_team_id = p['teamId']
+                    break
+
+            if participant:
+                opponents = []
+                teammates = []
+                for p in match['info']['participants']:
+                    if p['teamId'] == player_team_id and p['puuid'] != puuid:
+                        teammates.append({
+                            'puuid': p.get('puuid'),
+                            'riotIdGameName': p.get('riotIdGameName'),
+                            'riotIdTagline': p.get('riotIdTagline'),
+                            'championName': p['championName']
+                        })
+                    elif p['teamId'] != player_team_id:
+                        opponents.append({
+                            'puuid': p.get('puuid'),
+                            'riotIdGameName': p.get('riotIdGameName'),
+                            'riotIdTagline': p.get('riotIdTagline'),
+                            'championName': p['championName']
+                        })
+
+                team_had_afk = any(p.get('gameEndedInEarlySurrender') for p in match['info']['participants'] if p['teamId'] == player_team_id)
+
+                processed_matches.append({
+                    'matchId': match['metadata']['matchId'],
+                    'gameMode': match['info']['gameMode'],
+                    'gameDuration': match['info']['gameDuration'],
+                    'gameCreation': match['info']['gameCreation'],
+                    'gameEndedInEarlySurrender': match['info'].get('gameEndedInEarlySurrender', False),
+                    'gameEndedInSurrender': match['info']['teams'][0].get('win', False) != match['info']['teams'][1].get('win', False),
+                    'championName': participant['championName'],
+                    'championId': participant['championId'],
+                    'lane': participant.get('lane', 'NONE'),
+                    'role': participant.get('role', 'NONE'),
+                    'individualPosition': participant.get('individualPosition', 'NONE'),
+                    'kills': participant['kills'],
+                    'deaths': participant['deaths'],
+                    'assists': participant['assists'],
+                    'win': participant['win'],
+                    'pentaKills': participant.get('pentaKills', 0),
+                    'quadraKills': participant.get('quadraKills', 0),
+                    'tripleKills': participant.get('tripleKills', 0),
+                    'doubleKills': participant.get('doubleKills', 0),
+                    'largestMultiKill': participant.get('largestMultiKill', 0),
+                    'killingSprees': participant.get('killingSprees', 0),
+                    'largestKillingSpree': participant.get('largestKillingSpree', 0),
+                    'largestCriticalStrike': participant.get('largestCriticalStrike', 0),
+                    'longestTimeSpentLiving': participant.get('longestTimeSpentLiving', 0),
+                    'goldEarned': participant['goldEarned'],
+                    'goldPerMinute': round(participant['goldEarned'] / (match['info']['gameDuration'] / 60), 2),
+                    'totalMinionsKilled': participant.get('totalMinionsKilled', 0),
+                    'neutralMinionsKilled': participant.get('neutralMinionsKilled', 0),
+                    'totalDamageDealt': participant['totalDamageDealtToChampions'],
+                    'totalDamageDealtToChampions': participant['totalDamageDealtToChampions'],
+                    'damagePerMinute': round(participant['totalDamageDealtToChampions'] / (match['info']['gameDuration'] / 60), 2),
+                    'totalDamageTaken': participant.get('totalDamageTaken', 0),
+                    'timeCCingOthers': participant.get('timeCCingOthers', 0),
+                    'totalTimeCCDealt': participant.get('totalTimeCCDealt', 0),
+                    'visionScore': participant.get('visionScore', 0),
+                    'wardsPlaced': participant.get('wardsPlaced', 0),
+                    'wardsKilled': participant.get('wardsKilled', 0),
+                    'visionWardsBoughtInGame': participant.get('visionWardsBoughtInGame', 0),
+                    'spell1Casts': participant.get('spell1Casts', 0),
+                    'spell2Casts': participant.get('spell2Casts', 0),
+                    'spell3Casts': participant.get('spell3Casts', 0),
+                    'spell4Casts': participant.get('spell4Casts', 0),
+                    'summoner1Id': participant.get('summoner1Id', 0),
+                    'summoner2Id': participant.get('summoner2Id', 0),
+                    'summoner1Casts': participant.get('summoner1Casts', 0),
+                    'summoner2Casts': participant.get('summoner2Casts', 0),
+                    'bountyLevel': participant.get('bountyLevel', 0),
+                    'objectivesStolen': participant.get('objectivesStolen', 0),
+                    'turretKills': participant.get('turretKills', 0),
+                    'inhibitorKills': participant.get('inhibitorKills', 0),
+                    'teamId': player_team_id,
+                    'teamHadAFK': team_had_afk,
+                    'opponents': opponents,
+                    'teammates': teammates,
+                    'item0': participant.get('item0', 0),
+                    'item1': participant.get('item1', 0),
+                    'item2': participant.get('item2', 0),
+                    'item3': participant.get('item3', 0),
+                    'item4': participant.get('item4', 0),
+                    'item5': participant.get('item5', 0),
+                    'item6': participant.get('item6', 0)
+                })
+
+        return jsonify({
+            'matches': processed_matches,
+            'total_matches': len(processed_matches)
+        })
+
+    except Exception as e:
+        print(f"[FULL DATA] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/preview-stats', methods=['POST'])
 def get_preview_stats():
     """Get quick preview stats from first 10 matches"""
@@ -740,6 +1018,32 @@ def roast_player():
         return jsonify({'roast': roast})
 
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/recommend-champions', methods=['POST'])
+def recommend_champions():
+    """Generate AI-powered champion recommendations based on player stats"""
+    try:
+        data = request.json
+        matches = data.get('matches', [])
+        summoner_name = data.get('summonerName', 'Summoner')
+        region = data.get('region', 'na1')
+
+        if not matches:
+            return jsonify({'error': 'No match data provided'}), 400
+
+        analyzer = YearInReviewAnalyzer(matches, summoner_name, region)
+        recommendations = analyzer.recommend_champions()
+
+        if recommendations:
+            return jsonify({'recommendations': recommendations})
+        else:
+            return jsonify({'error': 'Could not generate recommendations'}), 500
+
+    except Exception as e:
+        print(f"[RECOMMEND CHAMPIONS API] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/roast-me-enhanced', methods=['POST'])
