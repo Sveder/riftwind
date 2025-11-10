@@ -120,7 +120,7 @@ $(document).ready(function() {
         // Split on # to get gameName and tagLine
         const parts = riotId.split('#');
         if (parts.length !== 2 || !parts[0] || !parts[1]) {
-            showError('Please enter your Riot ID in the format: GameName#Tag (e.g., Jankos#EUW)');
+            showError('Please enter your Riot ID in the format: nickname#Tag (e.g., Jankos#EUW)');
             return;
         }
 
@@ -189,48 +189,10 @@ $(document).ready(function() {
             }
         }
 
-        // Hide loading
-        $('.loading').hide();
-
-        // Show results section
-        $('.result-section').show();
-
-        // Display summoner info
-        $('#summonerName').text(data.summoner.name);
-        $('#summonerLevel').text(data.summoner.level);
-        $('#levelDisplay').text(data.summoner.level);
-
-        // Set profile icon
-        const profileIconUrl = `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/profileicon/${data.summoner.profileIconId}.png`;
-        $('#profileIcon').attr('src', profileIconUrl);
-
-        // Update year-in-review links with summoner data in URL
+        // Redirect directly to year-in-review page
         const summonerName = data.summoner.name;
         const urlParams = `?summoner=${encodeURIComponent(summonerName)}&region=${region}`;
-        $('a[href="/year-in-review"]').attr('href', `/year-in-review${urlParams}`);
-        $('a[href="/year-in-review-map"]').attr('href', `/year-in-review-map${urlParams}`);
-
-        // Display total games
-        $('#totalGames').text(data.totalGames);
-
-        // Display most played champion
-        if (data.mostPlayedChampion && data.mostPlayedChampion.championName) {
-            const championIconUrl = `https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/img/champion/${data.mostPlayedChampion.championName}.png`;
-            $('#championIcon').attr('src', championIconUrl);
-            $('#championName').text(data.mostPlayedChampion.championName);
-            $('#championLevel').text(data.mostPlayedChampion.championLevel);
-            $('#championPoints').text(data.mostPlayedChampion.championPoints.toLocaleString());
-        } else {
-            $('#championName').text('No champion data available');
-            $('#championLevel').text('0');
-            $('#championPoints').text('0');
-        }
-
-        // Display top 5 champions
-        displayTopChampions(data.topChampions);
-
-        // Display recent matches
-        displayRecentMatches(data.recentMatches);
+        window.location.href = `/year-in-review${urlParams}`;
     }
 
     function displayTopChampions(champions) {
@@ -409,11 +371,11 @@ $(document).ready(function() {
                 $('#feedbackEmail').val('');
                 submitBtn.prop('disabled', false).text('Send Feedback');
 
-                // Close modal after 2 seconds
+                // Close modal after 4 seconds
                 setTimeout(function() {
                     $('#feedbackModal').modal('hide');
                     $('#feedbackSuccess').hide();
-                }, 2000);
+                }, 4000);
             },
             error: function(xhr) {
                 $('#feedbackError').show();

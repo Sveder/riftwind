@@ -185,11 +185,21 @@ class YearInReviewAnalyzer:
         if not teammate_stats:
             return None
 
-        # Find teammate with most games AND high winrate
-        best_duo = max(
-            teammate_stats.items(),
-            key=lambda x: (x[1]['games'], x[1]['wins'] / x[1]['games'] if x[1]['games'] > 0 else 0)
-        )
+        # Separate teammates into those with 5+ games and those with fewer
+        frequent_teammates = {k: v for k, v in teammate_stats.items() if v['games'] >= 5}
+
+        if frequent_teammates:
+            # If we have teammates with 5+ games, pick by highest win rate
+            best_duo = max(
+                frequent_teammates.items(),
+                key=lambda x: x[1]['wins'] / x[1]['games'] if x[1]['games'] > 0 else 0
+            )
+        else:
+            # Otherwise pick by most games played
+            best_duo = max(
+                teammate_stats.items(),
+                key=lambda x: x[1]['games']
+            )
 
         return {
             'name': best_duo[0],
@@ -621,16 +631,14 @@ class YearInReviewAnalyzer:
 
         prompt = f"""You are a League of Legends analyst creating a fun year-in-review for {self.summoner_name}.
 
-Based on these stats, write a short, engaging narrative (3-4 sentences) about their year:
+Based on these stats, write an engaging narrative (6-8 sentences) about their year:
 
 Total Games: {len(self.matches)}
 Win Rate: {sum(1 for m in self.matches if m['win']) / len(self.matches) * 100:.1f}%
-Nemesis: {analysis_data.get('nemesis', {}).get('name', 'None')}
-BFF: {analysis_data.get('bff', {}).get('name', 'None')}
 Hot Streak Month: {analysis_data.get('hot_streak_month', {}).get('month', 'Unknown')}
 Pentakills: {analysis_data.get('highlight_stats', {}).get('total_pentakills', 0)}
 
-Make it fun, personal, and celebratory! Use emojis sparingly."""
+Make it fun, personal, and celebratory! Do not use emojis."""
 
         try:
             print("[AI NARRATIVE] Calling AWS Bedrock...")
@@ -638,7 +646,7 @@ Make it fun, personal, and celebratory! Use emojis sparingly."""
                 modelId=MODEL_ID,
                 body=json.dumps({
                     "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 300,
+                    "max_tokens": 600,
                     "messages": [
                         {
                             "role": "user",

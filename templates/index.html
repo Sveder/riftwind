@@ -39,11 +39,21 @@
             border: 2px solid #C79B3B;
             color: #E4E1D8;
         }
+        .form-select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23C79B3B' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 16px 12px;
+            padding-right: 2.5rem;
+        }
         .form-control:focus, .form-select:focus {
             background: #0A1428;
             border-color: #D4AF37;
             box-shadow: 0 0 0 0.25rem rgba(199, 155, 59, 0.25);
             color: #E4E1D8;
+        }
+        .form-select:focus {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23D4AF37' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
         }
         .form-control::placeholder {
             color: #786641;
@@ -184,24 +194,18 @@
         <div class="card">
             <div class="card-body p-4">
                 <div class="text-center mb-4">
-                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Riftwind Logo" style="max-width: 150px; margin-bottom: 20px;">
-                    <h1>Riftwind</h1>
-                    <p style="color: #C79B3B; font-size: 1.1rem; margin-top: 10px;">Looking back to sprint forward</p>
-
-                    <!-- Vision Game Link -->
-                    <div style="margin-top: 15px;">
-                        <a href="/ward-game" style="color: #3BC77B; text-decoration: none; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 5px; padding: 8px 15px; background: rgba(59, 199, 123, 0.1); border-radius: 20px; border: 1px solid rgba(59, 199, 123, 0.3); transition: all 0.3s ease;">
-                            <span style="font-size: 1.1rem;">🎮</span>
-                            <span>Practice Vision & CS</span>
-                        </a>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px;">
+                        <img src="{{ url_for('static', filename='logo.png') }}" alt="Riftwind Logo" style="max-width: 150px;">
+                        <h1 style="margin: 0;">Riftwind</h1>
                     </div>
+                    <p style="color: #C79B3B; font-size: 1.1rem; margin-top: 10px;">Looking back to sprint forward</p>
                 </div>
 
                 <form id="summonerForm">
                     <div class="mb-3">
                         <label for="riotId" class="form-label">Riot ID</label>
-                        <input type="text" class="form-control" id="riotId" placeholder="GameName#Tag" required>
-                        <small class="form-text text-muted">Enter your Riot ID in format: GameName#Tag (e.g., Jankos#EUW)</small>
+                        <input type="text" class="form-control" id="riotId" placeholder="nickname#Tag" required>
+                        <small class="form-text text-muted">Enter your Riot ID in format: nickname#Tag (e.g., Jankos#EUW)</small>
                     </div>
 
                     <div class="mb-3">
@@ -226,7 +230,7 @@
                         </select>
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100">Get Stats</button>
+                    <button type="submit" class="btn btn-primary w-100">Rewind me</button>
 
                     <!-- Quick Fill Buttons -->
                     <div class="mt-3">
@@ -234,6 +238,13 @@
                         <div class="d-flex gap-2 justify-content-center">
                             <button type="button" class="btn btn-sm" style="background: #0A1428; border: 1px solid #C79B3B; color: #C79B3B;" onclick="quickFill('Jankos', 'MYBAD', 'euw1')">Jankos</button>
                             <button type="button" class="btn btn-sm" style="background: #0A1428; border: 1px solid #C79B3B; color: #C79B3B;" onclick="quickFill('Curling Captain', 'EUW', 'euw1')">Broxah</button>
+                        </div>
+
+                        <!-- Vision Game Link -->
+                        <div style="margin-top: 15px; text-align: center;">
+                            <a href="/ward-game" style="color: #3BC77B; text-decoration: none; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 5px; padding: 8px 15px; background: rgba(59, 199, 123, 0.1); border-radius: 20px; border: 1px solid rgba(59, 199, 123, 0.3); transition: all 0.3s ease;">
+                                <span>Practice Vision & CS</span>
+                            </a>
                         </div>
                     </div>
                 </form>
@@ -365,7 +376,7 @@
                             <textarea class="form-control" id="feedbackText" rows="5" placeholder="Share your thoughts..." required></textarea>
                         </div>
                         <div id="feedbackSuccess" class="alert alert-success" style="display: none;">
-                            Thank you! Your feedback has been sent! 🎉
+                            Thank you! Your feedback has been sent!
                         </div>
                         <div id="feedbackError" class="alert alert-danger" style="display: none;">
                             Oops! Something went wrong. Please try again.
@@ -379,7 +390,7 @@
 
     <!-- Footer -->
     <footer style="text-align: center; padding: 30px 20px; margin-top: 50px; color: #A09B8C; font-size: 0.9rem;">
-        <p style="margin: 5px 0;">Riftwind v1.2.0</p>
+        <p style="margin: 5px 0;">Riftwind v1.4.0</p>
         <p style="margin: 5px 0;">© 2025 Michael Sverdlin. All rights reserved.</p>
     </footer>
 

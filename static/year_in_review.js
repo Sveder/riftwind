@@ -240,6 +240,16 @@ function generateYearInReview(summonerData) {
     console.log('[YEAR IN REVIEW] Sending API request with initial matches...');
     console.log('[YEAR IN REVIEW] Initial matches count:', summonerData.recentMatches.length);
 
+    // Log first and last game details
+    if (summonerData.recentMatches && summonerData.recentMatches.length > 0) {
+        const matches = summonerData.recentMatches;
+        const firstMatch = matches[matches.length - 1]; // Oldest match (last in array)
+        const lastMatch = matches[0]; // Most recent match (first in array)
+
+        console.log('[FIRST GAME] Date:', new Date(firstMatch.gameCreation).toLocaleString(), '| Champion:', firstMatch.championName);
+        console.log('[LAST GAME] Date:', new Date(lastMatch.gameCreation).toLocaleString(), '| Champion:', lastMatch.championName);
+    }
+
     $.ajax({
         url: '/api/year-in-review',
         method: 'POST',
@@ -460,37 +470,18 @@ function buildStoryCards(summonerData, reviewData) {
     // Card 1: Welcome & Total Games - Full Width
     cards.push(`
         <div class="story-card" id="welcomeCard">
-            <h2>Welcome Back, ${summonerData.summoner.name.split('#')[0]}!</h2>
+            <h2>Look back sprint forward, ${summonerData.summoner.name.split('#')[0]}!</h2>
             <div class="stat-number">${reviewData.total_matches}</div>
-            <p>Games Played in Your League Journey</p>
+            <p>${reviewData.total_matches} games played in your League journey</p>
             <p style="margin-top: 30px; color: #A09B8C;">${formatMarkdown(reviewData.narrative)}</p>
         </div>
     `);
 
-    // Card 2: Win Rate & Performance
+    // Card 2: Win Rate & Performance - COMBINED WITH TIME IN RIFT
     const wins = summonerData.recentMatches.filter(m => m.win).length;
     const winRate = ((wins / reviewData.total_matches) * 100).toFixed(1);
-    cards.push(`
-        <div class="story-card">
-            <h2>Your Battle Record</h2>
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="label">Win Rate</div>
-                    <div class="value">${winRate}%</div>
-                </div>
-                <div class="stat-box">
-                    <div class="label">Victories</div>
-                    <div class="value">${wins}</div>
-                </div>
-                <div class="stat-box">
-                    <div class="label">Defeats</div>
-                    <div class="value">${reviewData.total_matches - wins}</div>
-                </div>
-            </div>
-        </div>
-    `);
 
-    // Card 2.5: Total Hours Played
+    // Card 2.5: Time in Rift + Battle Records (Combined)
     if (analysis.total_hours) {
         const hours = analysis.total_hours.total_hours;
         const avgGameMinutes = analysis.total_hours.average_game_minutes;
@@ -499,10 +490,22 @@ function buildStoryCards(summonerData, reviewData) {
 
         cards.push(`
             <div class="story-card">
-                <h2>⏱️ Time in the Rift ⏱️</h2>
+                <h2>Stats</h2>
                 <div class="stat-number">${hours}</div>
                 <p style="font-size: 1.5rem; margin-bottom: 30px;">Hours Played</p>
                 <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="label">Win Rate</div>
+                        <div class="value">${winRate}%</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Victories</div>
+                        <div class="value">${wins}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Defeats</div>
+                        <div class="value">${reviewData.total_matches - wins}</div>
+                    </div>
                     <div class="stat-box">
                         <div class="label">Avg Game Length</div>
                         <div class="value">${avgGameMinutes} min</div>
@@ -521,36 +524,35 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
-    // Card 3: Nemesis
-    if (analysis.nemesis) {
+    // Card 3-4: Duo & Nemesis (Combined)
+    if (analysis.bff || analysis.nemesis) {
         cards.push(`
             <div class="story-card">
-                <h2>Your Nemesis 😈</h2>
-                <div class="nemesis-card">
-                    <h3 style="color: #C73B3B; font-size: 2.5rem;">${analysis.nemesis.name}</h3>
-                    <p style="font-size: 1.8rem; margin: 20px 0;">
-                        Lost <span style="color: #C73B3B; font-weight: bold;">${analysis.nemesis.losses}</span> times against them
-                    </p>
-                    <p style="color: #A09B8C;">This player has your number. Time for revenge in 2025!</p>
-                </div>
-            </div>
-        `);
-    }
-
-    // Card 4: BFF/Duo Partner
-    if (analysis.bff) {
-        cards.push(`
-            <div class="story-card">
-                <h2>Your Dynamic Duo 🤝</h2>
-                <div class="bff-card">
-                    <h3 style="color: #3BC77B; font-size: 2.5rem;">${analysis.bff.name}</h3>
-                    <p style="font-size: 1.8rem; margin: 20px 0;">
-                        <span style="color: #3BC77B; font-weight: bold;">${analysis.bff.games}</span> games together
-                    </p>
-                    <p style="font-size: 1.5rem; margin: 10px 0;">
-                        ${analysis.bff.winrate}% Win Rate
-                    </p>
-                    <p style="color: #A09B8C;">Your most reliable teammate!</p>
+                <h2>Frenemies</h2>
+                <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">
+                    ${analysis.bff ? `
+                        <div style="background: rgba(59, 199, 123, 0.1); border: 2px solid #3BC77B; border-radius: 15px; padding: 20px;">
+                            <h3 style="color: #3BC77B; font-size: 1.8rem; margin-bottom: 15px;">Dynamic Duo</h3>
+                            <h4 style="color: #3BC77B; font-size: 2rem;">${analysis.bff.name}</h4>
+                            <p style="font-size: 1.5rem; margin: 15px 0;">
+                                <span style="color: #3BC77B; font-weight: bold;">${analysis.bff.games}</span> games
+                            </p>
+                            <p style="font-size: 1.3rem; margin: 10px 0;">
+                                ${analysis.bff.winrate}% Win Rate
+                            </p>
+                            <p style="color: #A09B8C; font-size: 0.9rem;">Your most reliable teammate!</p>
+                        </div>
+                    ` : ''}
+                    ${analysis.nemesis ? `
+                        <div style="background: rgba(199, 59, 59, 0.1); border: 2px solid #C73B3B; border-radius: 15px; padding: 20px;">
+                            <h3 style="color: #C73B3B; font-size: 1.8rem; margin-bottom: 15px;">Your Nemesis</h3>
+                            <h4 style="color: #C73B3B; font-size: 2rem;">${analysis.nemesis.name}</h4>
+                            <p style="font-size: 1.5rem; margin: 15px 0;">
+                                Lost <span style="color: #C73B3B; font-weight: bold;">${analysis.nemesis.losses}</span> times
+                            </p>
+                            <p style="color: #A09B8C; font-size: 0.9rem;">This player has your number!</p>
+                        </div>
+                    ` : ''}
                 </div>
             </div>
         `);
@@ -637,7 +639,7 @@ function buildStoryCards(summonerData, reviewData) {
         if (highlights.total_pentakills > 0) {
             highlightCards.push(`
                 <div class="stat-box">
-                    <div class="label">⭐ Pentakills</div>
+                    <div class="label">Pentakills</div>
                     <div class="value">${highlights.total_pentakills}</div>
                 </div>
             `);
@@ -720,7 +722,7 @@ function buildStoryCards(summonerData, reviewData) {
         if (highlightCards.length > 0) {
             cards.push(`
                 <div class="story-card">
-                    <h2>🏆 Highlight Reel 🏆</h2>
+                    <h2>Highlight Reel</h2>
                     <p style="font-size: 1.5rem; margin-bottom: 40px;">Your most epic moments</p>
                     <div class="stats-grid">
                         ${highlightCards.join('')}
@@ -730,71 +732,76 @@ function buildStoryCards(summonerData, reviewData) {
         }
     }
 
-    // Card 9: Win Streak
+    // Card 9-11: Remember This (Combined: Win Streak, AFK Wins, Miracle Comeback)
+    const rememberThisCards = [];
+
+    // Add win streak if significant
     if (analysis.longest_win_streak && analysis.longest_win_streak.streak > 3) {
         const streakDetails = analysis.longest_win_streak.start_game ? `
-            <div style="margin-top: 30px; padding: 20px; background: rgba(199, 155, 59, 0.1); border-radius: 15px;">
-                <p style="font-size: 1.2rem; color: #C79B3B; margin-bottom: 15px;">
-                    Started with <strong>${analysis.longest_win_streak.start_game.champion}</strong> on ${analysis.longest_win_streak.start_game.date}
+            <div style="margin-top: 15px; padding: 15px; background: rgba(199, 155, 59, 0.1); border-radius: 10px;">
+                <p style="font-size: 0.9rem; color: #A09B8C; margin-bottom: 10px;">
+                    Started: <strong style="color: #C79B3B;">${analysis.longest_win_streak.start_game.champion}</strong> on ${analysis.longest_win_streak.start_game.date}
                 </p>
-                <p style="font-size: 1rem; color: #A09B8C;">
-                    KDA: ${analysis.longest_win_streak.start_game.kda}
-                </p>
-                <p style="font-size: 1.2rem; color: #C79B3B; margin-top: 15px;">
-                    Ended with <strong>${analysis.longest_win_streak.end_game.champion}</strong> on ${analysis.longest_win_streak.end_game.date}
-                </p>
-                <p style="font-size: 1rem; color: #A09B8C;">
-                    KDA: ${analysis.longest_win_streak.end_game.kda}
+                <p style="font-size: 0.9rem; color: #A09B8C;">
+                    Ended: <strong style="color: #C79B3B;">${analysis.longest_win_streak.end_game.champion}</strong> on ${analysis.longest_win_streak.end_game.date}
                 </p>
             </div>
         ` : '';
 
-        cards.push(`
-            <div class="story-card">
-                <h2>🔥 Unstoppable 🔥</h2>
-                <div class="stat-number">${analysis.longest_win_streak.streak}</div>
-                <p style="font-size: 1.8rem; margin: 30px 0;">Game Win Streak</p>
+        rememberThisCards.push(`
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                <h3 style="color: #C79B3B; font-size: 1.5rem; margin-bottom: 15px;">Unstoppable</h3>
+                <div class="stat-number" style="font-size: 3rem;">${analysis.longest_win_streak.streak}</div>
+                <p style="font-size: 1.2rem; margin: 15px 0;">Game Win Streak</p>
                 ${streakDetails}
-                <p style="color: #A09B8C; margin-top: 20px;">You were on fire!</p>
             </div>
         `);
     }
 
-    // Card 10: AFK Stats (if significant)
+    // Add AFK wins if exists
     if (analysis.afk_stats && analysis.afk_stats.won_with_afk > 0) {
-        cards.push(`
-            <div class="story-card">
-                <h2>💪 Against All Odds 💪</h2>
-                <p style="font-size: 1.8rem; margin: 30px 0;">
-                    Won <span style="color: #3BC77B; font-size: 3rem; font-weight: bold;">${analysis.afk_stats.won_with_afk}</span>
+        rememberThisCards.push(`
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                <h3 style="color: #3BC77B; font-size: 1.5rem; margin-bottom: 15px;">Against All Odds</h3>
+                <p style="font-size: 1.2rem;">
+                    Won <span style="color: #3BC77B; font-size: 2.5rem; font-weight: bold;">${analysis.afk_stats.won_with_afk}</span>
                     ${analysis.afk_stats.won_with_afk === 1 ? 'game' : 'games'} with an AFK teammate
                 </p>
-                <p style="color: #A09B8C;">True carry potential!</p>
             </div>
         `);
     }
 
-    // Card 11: Miracle Comeback
+    // Add miracle comeback if exists
     if (analysis.miracle_comeback) {
         const comeback = analysis.miracle_comeback;
-        cards.push(`
-            <div class="story-card">
-                <h2>🌟 Miracle Comeback 🌟</h2>
-                <p style="font-size: 1.5rem; margin: 20px 0;">
-                    Died <strong style="color: #C73B3B; font-size: 2.5rem;">${comeback.deaths}</strong> times but still won!
+        rememberThisCards.push(`
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+                <h3 style="color: #FFD700; font-size: 1.5rem; margin-bottom: 15px;">Miracle Comeback</h3>
+                <p style="font-size: 1.1rem; margin: 15px 0;">
+                    Died <strong style="color: #C73B3B; font-size: 2rem;">${comeback.deaths}</strong> times but still won!
                 </p>
-                <div style="margin-top: 30px; padding: 20px; background: rgba(59, 199, 123, 0.1); border-radius: 15px;">
-                    <p style="font-size: 1.2rem; color: #3BC77B; margin-bottom: 10px;">
+                <div style="margin-top: 15px; padding: 15px; background: rgba(59, 199, 123, 0.1); border-radius: 10px;">
+                    <p style="font-size: 1rem; color: #3BC77B; margin-bottom: 8px;">
                         <strong>${comeback.championName}</strong>
                     </p>
-                    <p style="font-size: 1rem; color: #A09B8C;">
+                    <p style="font-size: 0.85rem; color: #A09B8C;">
                         ${comeback.date} at ${comeback.time}
                     </p>
-                    <p style="font-size: 1.3rem; color: #C79B3B; margin-top: 15px;">
+                    <p style="font-size: 1rem; color: #C79B3B; margin-top: 10px;">
                         Final KDA: ${comeback.kills}/${comeback.deaths}/${comeback.assists} (${comeback.kda})
                     </p>
                 </div>
-                <p style="color: #A09B8C; margin-top: 20px;">Never give up, never surrender!</p>
+            </div>
+        `);
+    }
+
+    // Only show the combined card if there are memorable moments
+    if (rememberThisCards.length > 0) {
+        cards.push(`
+            <div class="story-card">
+                <h2>Remember This</h2>
+                <p style="font-size: 1.3rem; margin-bottom: 30px; color: #A09B8C;">Your most memorable moments</p>
+                ${rememberThisCards.join('')}
             </div>
         `);
     }
@@ -813,83 +820,105 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
-    // Card 12: What-If Scenarios
-    if (analysis.what_if_scenarios) {
-        const whatIf = analysis.what_if_scenarios.main_champion_only;
-        const diffText = whatIf.difference > 0 ? `+${whatIf.difference}%` : `${whatIf.difference}%`;
-        const diffColor = whatIf.difference > 0 ? '#3BC77B' : '#C73B3B';
+    // Card 12: What-If Scenarios - REMOVED
 
-        cards.push(`
-            <div class="story-card">
-                <h2>🤔 What If...? 🤔</h2>
-                <p style="font-size: 1.5rem; margin: 30px 0;">
-                    If you ONLY played ${whatIf.champion}...
-                </p>
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <div class="label">Games on ${whatIf.champion}</div>
-                        <div class="value">${whatIf.games_played}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="label">Win Rate</div>
-                        <div class="value">${whatIf.winrate}%</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="label">Difference</div>
-                        <div class="value" style="color: ${diffColor};">${diffText}</div>
-                    </div>
-                </div>
-                <p style="color: #A09B8C; margin-top: 30px;">
-                    ${whatIf.difference > 5 ? 'Maybe stick to your main! 🎯' : whatIf.difference < -5 ? 'Variety is the spice of life! 🌈' : 'You are doing great either way! ✨'}
-                </p>
-            </div>
-        `);
-    }
-
-    // Card 13: Time Analysis
-    if (analysis.time_analysis && analysis.time_analysis.best_time) {
-        const timeData = analysis.time_analysis;
-        const bestTime = timeData.best_time;
-        const bestStats = timeData[bestTime];
-
-        cards.push(`
-            <div class="story-card">
-                <h2>⏰ Peak Hours ⏰</h2>
-                <p style="font-size: 1.8rem; margin: 30px 0;">
-                    You play best during: <span style="color: #FFD700;">${bestTime}</span>
-                </p>
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <div class="label">Win Rate</div>
-                        <div class="value">${bestStats.winrate}%</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="label">Games Played</div>
-                        <div class="value">${bestStats.games}</div>
-                    </div>
-                </div>
-            </div>
-        `);
-    }
+    // Card 13: Time Analysis (Peak Hours) - REMOVED
 
     // Card 14: Champion Diversity
     if (analysis.champion_diversity) {
         const diversity = analysis.champion_diversity;
+
+        // Generate wrong answers for guessing game from other champions
+        const allChampions = summonerData.recentMatches.map(m => m.championName);
+        const uniqueChamps = [...new Set(allChampions)];
+
+        // Function to get random wrong answers
+        function getWrongAnswers(correctAnswer, count, allChamps) {
+            const wrongAnswers = allChamps.filter(c => c !== correctAnswer);
+            const shuffled = wrongAnswers.sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, count);
+        }
+
+        // Create options for #2 and #3 champions
+        const secondChamp = diversity.top_3_champions[1] || null;
+        const thirdChamp = diversity.top_3_champions[2] || null;
+
+        let secondOptions = [];
+        let thirdOptions = [];
+
+        if (secondChamp) {
+            const wrongAnswers = getWrongAnswers(secondChamp.name, 2, uniqueChamps);
+            secondOptions = [secondChamp.name, ...wrongAnswers].sort(() => 0.5 - Math.random());
+        }
+
+        if (thirdChamp) {
+            const wrongAnswers = getWrongAnswers(thirdChamp.name, 2, uniqueChamps);
+            thirdOptions = [thirdChamp.name, ...wrongAnswers].sort(() => 0.5 - Math.random());
+        }
+
         cards.push(`
             <div class="story-card">
-                <h2>${diversity.one_trick ? '🎯 One-Trick Pony' : '🌈 Champion Pool'} </h2>
+                <h2>${diversity.one_trick ? 'One-Trick Pony' : 'Champion Pool'}</h2>
                 <div class="stat-number">${diversity.unique_champions}</div>
                 <p style="font-size: 1.8rem; margin: 30px 0;">Unique Champions Played</p>
-                <div class="stats-grid">
-                    ${diversity.top_3_champions.map((champ, idx) => `
-                        <div class="stat-box">
-                            <div class="label">${idx + 1}. ${champ.name}</div>
-                            <div class="value">${champ.games}</div>
-                        </div>
-                    `).join('')}
+
+                <!-- Top Champion -->
+                <div style="background: rgba(199, 155, 59, 0.15); border: 2px solid #C79B3B; border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                    <div style="text-align: center;">
+                        <div style="color: #C79B3B; font-size: 1rem; font-weight: bold; margin-bottom: 10px;">👑 MOST PLAYED</div>
+                        <div style="color: #E4E1D8; font-size: 1.8rem; font-weight: bold; margin-bottom: 5px;">${diversity.top_3_champions[0].name}</div>
+                        <div style="color: #C79B3B; font-size: 1.3rem; font-weight: bold;">${diversity.top_3_champions[0].games} Games</div>
+                    </div>
                 </div>
+
+                ${secondChamp ? `
+                <!-- Guess #2 Champion -->
+                <div style="background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 20px; margin-bottom: 15px;">
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <div style="background: linear-gradient(135deg, #C79B3B, #D4AF37); padding: 8px 20px; border-radius: 20px; display: inline-block; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(199, 155, 59, 0.3); animation: pulse 2s infinite;">
+                            <span style="color: #0A0E12; font-weight: bold; font-size: 0.95rem;">🎮 CAN YOU GUESS #2?</span>
+                        </div>
+                        <div style="color: #A09B8C; font-size: 0.9rem; margin-top: 5px;">${secondChamp.games} games played</div>
+                    </div>
+                    <div id="guess-2-options" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                        ${secondOptions.map(champ => `
+                            <button onclick="checkGuess(2, '${champ}', '${secondChamp.name}', ${secondChamp.games})"
+                                    style="background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(199, 155, 59, 0.3); border-radius: 8px; padding: 15px 10px; color: #E4E1D8; font-size: 0.95rem; font-weight: bold; cursor: pointer; transition: all 0.2s;"
+                                    onmouseover="this.style.background='rgba(199, 155, 59, 0.2)'; this.style.borderColor='#C79B3B';"
+                                    onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.borderColor='rgba(199, 155, 59, 0.3)';">
+                                ${champ}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div id="guess-2-result" style="display: none; text-align: center; padding: 15px; border-radius: 8px; margin-top: 10px;"></div>
+                </div>
+                ` : ''}
+
+                ${thirdChamp ? `
+                <!-- Guess #3 Champion -->
+                <div style="background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <div style="background: linear-gradient(135deg, #8B7355, #A0826D); padding: 8px 20px; border-radius: 20px; display: inline-block; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(160, 130, 109, 0.3); animation: pulse 2s infinite;">
+                            <span style="color: #0A0E12; font-weight: bold; font-size: 0.95rem;">🎯 CAN YOU GUESS #3?</span>
+                        </div>
+                        <div style="color: #A09B8C; font-size: 0.9rem; margin-top: 5px;">${thirdChamp.games} games played</div>
+                    </div>
+                    <div id="guess-3-options" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                        ${thirdOptions.map(champ => `
+                            <button onclick="checkGuess(3, '${champ}', '${thirdChamp.name}', ${thirdChamp.games})"
+                                    style="background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(160, 130, 109, 0.3); border-radius: 8px; padding: 15px 10px; color: #E4E1D8; font-size: 0.95rem; font-weight: bold; cursor: pointer; transition: all 0.2s;"
+                                    onmouseover="this.style.background='rgba(160, 130, 109, 0.2)'; this.style.borderColor='#A0826D';"
+                                    onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'; this.style.borderColor='rgba(160, 130, 109, 0.3)';">
+                                ${champ}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div id="guess-3-result" style="display: none; text-align: center; padding: 15px; border-radius: 8px; margin-top: 10px;"></div>
+                </div>
+                ` : ''}
+
                 <p style="color: #A09B8C; margin-top: 30px;">
-                    ${diversity.one_trick ? 'You know what you love! 💪' : 'Versatility is your strength! 🌟'}
+                    ${diversity.one_trick ? 'You know what you love!' : 'Versatility is your strength!'}
                 </p>
             </div>
         `);
@@ -974,8 +1003,8 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
-    // Card 15: CS Efficiency
-    if (analysis.cs_efficiency) {
+    // Card 15: CS Efficiency (Don't show if jungle main)
+    if (analysis.cs_efficiency && !analysis.cs_efficiency.is_jungler) {
         const cs = analysis.cs_efficiency;
         const monthlyData = cs.monthly_data || [];
 
@@ -1165,19 +1194,19 @@ function buildStoryCards(summonerData, reviewData) {
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                     <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
-                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">Baseline WR</p>
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 8px;">Baseline WR</p>
                         <p style="color: #3BC77B; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_normal}%</p>
-                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 3px; font-style: italic;">With momentum</p>
+                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 8px; font-style: italic;">With momentum</p>
                     </div>
                     <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
-                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">After 2 Losses</p>
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 8px;">After 2 Losses</p>
                         <p style="color: ${tilt.wr_after_2_losses < tilt.wr_normal ? '#C73B3B' : '#3BC77B'}; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_after_2_losses}%</p>
-                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 3px;">${tilt.games_analyzed_after_2_losses} games</p>
+                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 8px;">${tilt.games_analyzed_after_2_losses} games</p>
                     </div>
                     <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
-                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 5px;">After 3 Losses</p>
+                        <p style="color: #A09B8C; font-size: 0.8rem; margin-bottom: 8px;">After 3 Losses</p>
                         <p style="color: ${tilt.wr_after_3_losses < tilt.wr_normal ? '#C73B3B' : '#3BC77B'}; font-size: 1.5rem; font-weight: bold; margin: 0;">${tilt.wr_after_3_losses}%</p>
-                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 3px;">${tilt.games_analyzed_after_3_losses} games</p>
+                        <p style="color: #A09B8C; font-size: 0.65rem; margin-top: 8px;">${tilt.games_analyzed_after_3_losses} games</p>
                     </div>
                 </div>
 
@@ -1267,171 +1296,9 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
-    // Card 19: Learning Curves
-    if (analysis.learning_curves) {
-        const learning = analysis.learning_curves;
-        const improvementColor = learning.is_improving ? '#3BC77B' : '#C79B3B';
-        const improvementEmoji = learning.is_improving ? '📈' : '📊';
+    // Card 19: Learning Curves - REMOVED
 
-        cards.push(`
-            <div class="story-card">
-                <h2>${improvementEmoji} Learning Curve</h2>
-                <h3 style="color: ${improvementColor}; font-size: 1.5rem; margin-bottom: 20px;">
-                    ${learning.is_improving ? 'Leveling Up!' : 'Holding Steady'}
-                </h3>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 25px;">
-                    <!-- CS/min Progress -->
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
-                        <p style="color: #A09B8C; font-size: 0.85rem; margin-bottom: 10px; text-align: center;">CS/min</p>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <div>
-                                <p style="color: #A09B8C; font-size: 0.7rem;">Early</p>
-                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.cs_per_min.early}</p>
-                            </div>
-                            <div style="text-align: center;">
-                                <p style="color: #C79B3B; font-size: 0.7rem;">→</p>
-                            </div>
-                            <div style="text-align: right;">
-                                <p style="color: #A09B8C; font-size: 0.7rem;">Late</p>
-                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.cs_per_min.late}</p>
-                            </div>
-                        </div>
-                        <p style="color: ${learning.cs_per_min.improvement > 0 ? '#3BC77B' : '#C73B3B'}; font-size: 0.9rem; text-align: center; font-weight: bold;">
-                            ${learning.cs_per_min.improvement > 0 ? '+' : ''}${learning.cs_per_min.improvement}
-                        </p>
-                    </div>
-
-                    <!-- KDA Progress -->
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
-                        <p style="color: #A09B8C; font-size: 0.85rem; margin-bottom: 10px; text-align: center;">KDA</p>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <div>
-                                <p style="color: #A09B8C; font-size: 0.7rem;">Early</p>
-                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.kda.early}</p>
-                            </div>
-                            <div style="text-align: center;">
-                                <p style="color: #C79B3B; font-size: 0.7rem;">→</p>
-                            </div>
-                            <div style="text-align: right;">
-                                <p style="color: #A09B8C; font-size: 0.7rem;">Late</p>
-                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.kda.late}</p>
-                            </div>
-                        </div>
-                        <p style="color: ${learning.kda.improvement > 0 ? '#3BC77B' : '#C73B3B'}; font-size: 0.9rem; text-align: center; font-weight: bold;">
-                            ${learning.kda.improvement > 0 ? '+' : ''}${learning.kda.improvement}
-                        </p>
-                    </div>
-
-                    <!-- Win Rate Progress -->
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px;">
-                        <p style="color: #A09B8C; font-size: 0.85rem; margin-bottom: 10px; text-align: center;">Win Rate</p>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <div>
-                                <p style="color: #A09B8C; font-size: 0.7rem;">Early</p>
-                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.winrate.early}%</p>
-                            </div>
-                            <div style="text-align: center;">
-                                <p style="color: #C79B3B; font-size: 0.7rem;">→</p>
-                            </div>
-                            <div style="text-align: right;">
-                                <p style="color: #A09B8C; font-size: 0.7rem;">Late</p>
-                                <p style="color: #E4E1D8; font-size: 1.1rem; font-weight: bold;">${learning.winrate.late}%</p>
-                            </div>
-                        </div>
-                        <p style="color: ${learning.winrate.improvement > 0 ? '#3BC77B' : '#C73B3B'}; font-size: 0.9rem; text-align: center; font-weight: bold;">
-                            ${learning.winrate.improvement > 0 ? '+' : ''}${learning.winrate.improvement}%
-                        </p>
-                    </div>
-                </div>
-
-                ${learning.is_improving ? `
-                    <div style="background: rgba(59, 199, 123, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #3BC77B;">
-                        <p style="color: #3BC77B; font-size: 1.1rem; margin: 0; font-weight: bold;">
-                            You're on the grind! 💪
-                        </p>
-                        <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
-                            Your performance has measurably improved over the year
-                        </p>
-                    </div>
-                ` : `
-                    <div style="background: rgba(199, 155, 59, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #C79B3B;">
-                        <p style="color: #C79B3B; font-size: 1.1rem; margin: 0; font-weight: bold;">
-                            Consistent Performance
-                        </p>
-                        <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
-                            You're maintaining your skill level
-                        </p>
-                    </div>
-                `}
-            </div>
-        `);
-    }
-
-    // Card 20: Meta Adaptation
-    if (analysis.meta_adaptation) {
-        const meta = analysis.meta_adaptation;
-        const adaptColor = meta.is_adapting ? '#3BC77B' : '#C79B3B';
-
-        cards.push(`
-            <div class="story-card">
-                <h2>🔄 Meta Adaptation</h2>
-                <h3 style="color: ${adaptColor}; font-size: 1.5rem; margin-bottom: 20px;">
-                    ${meta.is_adapting ? 'Meta Chaser' : 'Creature of Habit'}
-                </h3>
-
-                <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 10px;">Patches Played: <strong style="color: #E4E1D8;">${meta.patches_played}</strong></p>
-                    <p style="color: #A09B8C; font-size: 0.9rem; margin: 0;">Diversity Score: <strong style="color: ${adaptColor};">${meta.avg_diversity_score}</strong></p>
-                    <p style="color: #A09B8C; font-size: 0.75rem; margin-top: 5px; font-style: italic;">
-                        (Higher = more champion variety per patch)
-                    </p>
-                </div>
-
-                ${meta.patch_data && meta.patch_data.length > 0 ? `
-                    <div style="margin-top: 15px;">
-                        <p style="color: #A09B8C; font-size: 0.9rem; margin-bottom: 10px;">Recent Patches:</p>
-                        ${meta.patch_data.slice(0, 3).map(patch => `
-                            <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <span style="color: #C79B3B; font-weight: bold;">Patch ${patch.patch}</span>
-                                        <span style="color: #A09B8C; font-size: 0.85rem; margin-left: 10px;">${patch.games} games</span>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <span style="color: ${patch.winrate >= 50 ? '#3BC77B' : '#C73B3B'}; font-weight: bold;">${patch.winrate}%</span>
-                                    </div>
-                                </div>
-                                <p style="color: #A09B8C; font-size: 0.75rem; margin-top: 5px;">
-                                    ${patch.unique_champions} unique champions
-                                </p>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-
-                ${meta.is_adapting ? `
-                    <div style="margin-top: 20px; background: rgba(59, 199, 123, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #3BC77B;">
-                        <p style="color: #3BC77B; font-size: 1.1rem; margin: 0; font-weight: bold;">
-                            Adapting to the Meta
-                        </p>
-                        <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
-                            You explore different champions each patch - keeping up with the meta!
-                        </p>
-                    </div>
-                ` : `
-                    <div style="margin-top: 20px; background: rgba(199, 155, 59, 0.1); border-radius: 10px; padding: 15px; border-left: 3px solid #C79B3B;">
-                        <p style="color: #C79B3B; font-size: 1.1rem; margin: 0; font-weight: bold;">
-                            Comfort Pick Player
-                        </p>
-                        <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
-                            You stick to your favorite champions regardless of patch changes
-                        </p>
-                    </div>
-                `}
-            </div>
-        `);
-    }
+    // Card 20: Meta Adaptation - REMOVED
 
     // NEW INSIGHTS CARDS
 
@@ -1519,54 +1386,7 @@ function buildStoryCards(summonerData, reviewData) {
         `);
     }
 
-    // Card 23: Objective Priority
-    if (analysis.objective_priority) {
-        const obj = analysis.objective_priority;
-        const impactColor = obj.objective_impact > 10 ? '#3BC77B' : obj.objective_impact > 0 ? '#C79B3B' : '#C73B3B';
-
-        cards.push(`
-            <div class="story-card">
-                <h2>🐉 Objective Mastery</h2>
-                <div class="stat-number" style="color: ${impactColor};">+${Math.abs(obj.objective_impact)}%</div>
-                <p style="font-size: 1.3rem; margin-bottom: 20px;">Win Rate Impact</p>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; text-align: center;">
-                        <p style="color: #9966FF; font-size: 3rem; margin: 0;">🐉</p>
-                        <p style="color: #E4E1D8; font-size: 1.8rem; font-weight: bold; margin: 10px 0;">${obj.avg_dragons_per_game}</p>
-                        <p style="color: #A09B8C; font-size: 0.9rem;">Dragons/Game</p>
-                    </div>
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; text-align: center;">
-                        <p style="color: #7B68EE; font-size: 3rem; margin: 0;">👑</p>
-                        <p style="color: #E4E1D8; font-size: 1.8rem; font-weight: bold; margin: 10px 0;">${obj.avg_barons_per_game}</p>
-                        <p style="color: #A09B8C; font-size: 0.9rem;">Barons/Game</p>
-                    </div>
-                </div>
-
-                <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <p style="color: #A09B8C; font-size: 0.9rem; margin: 0;">With 2+ Objectives:</p>
-                        <p style="color: #3BC77B; font-size: 1.5rem; font-weight: bold; margin: 0;">${obj.high_obj_winrate}%</p>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-                        <p style="color: #A09B8C; font-size: 0.9rem; margin: 0;">Overall Win Rate:</p>
-                        <p style="color: #E4E1D8; font-size: 1.5rem; font-weight: bold; margin: 0;">${obj.overall_winrate}%</p>
-                    </div>
-                </div>
-
-                <div style="background: ${obj.is_objective_focused ? 'rgba(59, 199, 123, 0.1)' : 'rgba(199, 155, 59, 0.1)'}; border-radius: 10px; padding: 15px; border-left: 3px solid ${impactColor};">
-                    <p style="color: ${impactColor}; font-size: 1.1rem; margin: 0; font-weight: bold;">
-                        ${obj.is_objective_focused ? '🎯 Macro God!' : '💡 Focus More on Objectives'}
-                    </p>
-                    <p style="color: #A09B8C; font-size: 0.9rem; margin-top: 8px;">
-                        ${obj.is_objective_focused ?
-                            'Objectives significantly boost your win rate - keep prioritizing them!' :
-                            'Try focusing more on dragons and barons to increase your win rate!'}
-                    </p>
-                </div>
-            </div>
-        `);
-    }
+    // Card 23: Objective Priority - REMOVED
 
     // Card 24: Tilt Factor (Mental Fortitude)
     if (analysis.tilt_factor) {
@@ -1862,7 +1682,7 @@ async function shareToTwitter() {
     }
 
     // Create engaging message with stats
-    const text = `Just checked out my League of Legends 2025 Year in Review on Riftwind! 🎮\n\n${totalGames} games played • ${winRate}% win rate • Main: ${topChamp}\n\nSee your own stats:`;
+    const text = `Just checked out my League of Legends 2025 Year in Review on Riftwind!\n\n${totalGames} games played • ${winRate}% win rate • Main: ${topChamp}\n\nSee your own stats:`;
 
     // Build URL with user parameters
     const shareUrl = `${window.location.origin}/year-in-review?summoner=${encodeURIComponent(summonerName)}&tag=${encodeURIComponent(tagLine)}&region=${encodeURIComponent(region)}`;
@@ -1943,7 +1763,7 @@ async function shareToBluesky() {
     }
 
     // Create engaging message with stats
-    const text = `Just checked out my League of Legends 2025 Year in Review on Riftwind! 🎮\n\n${totalGames} games played • ${winRate}% win rate • Main: ${topChamp}\n\nSee your own stats:`;
+    const text = `Just checked out my League of Legends 2025 Year in Review on Riftwind!\n\n${totalGames} games played • ${winRate}% win rate • Main: ${topChamp}\n\nSee your own stats:`;
 
     // Build URL with user parameters
     const shareUrl = `${window.location.origin}/year-in-review?summoner=${encodeURIComponent(summonerName)}&tag=${encodeURIComponent(tagLine)}&region=${encodeURIComponent(region)}`;
@@ -2002,3 +1822,63 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.error('[INIT] ❌ Start button not found!');
     }
 });
+
+// Champion Guessing Game Function
+window.checkGuess = function(position, guessedChamp, correctChamp, gamesPlayed) {
+    const optionsDiv = document.getElementById(`guess-${position}-options`);
+    const resultDiv = document.getElementById(`guess-${position}-result`);
+    const buttons = optionsDiv.querySelectorAll('button');
+
+    // Disable all buttons
+    buttons.forEach(btn => {
+        btn.style.cursor = 'not-allowed';
+        btn.style.opacity = '0.6';
+        btn.onclick = null;
+    });
+
+    // Check if guess is correct
+    const isCorrect = guessedChamp === correctChamp;
+
+    // Show result
+    if (isCorrect) {
+        resultDiv.innerHTML = `
+            <div style="background: rgba(59, 199, 123, 0.2); border: 2px solid #3BC77B; border-radius: 8px; padding: 20px;">
+                <div style="font-size: 2.5rem; margin-bottom: 10px;">✅</div>
+                <div style="color: #3BC77B; font-size: 1.3rem; font-weight: bold; margin-bottom: 8px;">CORRECT!</div>
+                <div style="color: #E4E1D8; font-size: 1.1rem; margin-bottom: 5px;">${correctChamp}</div>
+                <div style="color: #A09B8C; font-size: 0.95rem;">${gamesPlayed} games played</div>
+            </div>
+        `;
+    } else {
+        resultDiv.innerHTML = `
+            <div style="background: rgba(199, 59, 59, 0.2); border: 2px solid #C73B3B; border-radius: 8px; padding: 20px;">
+                <div style="font-size: 2.5rem; margin-bottom: 10px;">❌</div>
+                <div style="color: #C73B3B; font-size: 1.3rem; font-weight: bold; margin-bottom: 8px;">NOT QUITE!</div>
+                <div style="color: #E4E1D8; font-size: 0.95rem; margin-bottom: 5px;">The correct answer was:</div>
+                <div style="color: #3BC77B; font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${correctChamp}</div>
+                <div style="color: #A09B8C; font-size: 0.95rem;">${gamesPlayed} games played</div>
+            </div>
+        `;
+    }
+
+    // Highlight correct answer in buttons
+    buttons.forEach(btn => {
+        const btnText = btn.textContent.trim();
+        if (btnText === correctChamp) {
+            btn.style.background = 'rgba(59, 199, 123, 0.3)';
+            btn.style.borderColor = '#3BC77B';
+            btn.style.color = '#3BC77B';
+        } else if (btnText === guessedChamp && !isCorrect) {
+            btn.style.background = 'rgba(199, 59, 59, 0.3)';
+            btn.style.borderColor = '#C73B3B';
+            btn.style.color = '#C73B3B';
+        }
+    });
+
+    resultDiv.style.display = 'block';
+
+    // Add a small celebration animation for correct answers
+    if (isCorrect) {
+        resultDiv.style.animation = 'celebration 0.5s ease-out';
+    }
+};
