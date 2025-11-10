@@ -866,6 +866,10 @@ function buildStoryCards(summonerData, reviewData) {
                 <div style="background: rgba(199, 155, 59, 0.15); border: 2px solid #C79B3B; border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                     <div style="text-align: center;">
                         <div style="color: #C79B3B; font-size: 1rem; font-weight: bold; margin-bottom: 10px;">👑 MOST PLAYED</div>
+                        <img src="https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/${diversity.top_3_champions[0].name.replace(/[^a-zA-Z]/g, '')}.png"
+                             alt="${diversity.top_3_champions[0].name}"
+                             style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid #C79B3B; margin-bottom: 15px;"
+                             onerror="this.style.display='none'">
                         <div style="color: #E4E1D8; font-size: 1.8rem; font-weight: bold; margin-bottom: 5px;">${diversity.top_3_champions[0].name}</div>
                         <div style="color: #C79B3B; font-size: 1.3rem; font-weight: bold;">${diversity.top_3_champions[0].games} Games</div>
                     </div>
@@ -1840,11 +1844,17 @@ window.checkGuess = function(position, guessedChamp, correctChamp, gamesPlayed) 
     const isCorrect = guessedChamp === correctChamp;
 
     // Show result
+    const championIconUrl = `https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/${correctChamp.replace(/[^a-zA-Z]/g, '')}.png`;
+
     if (isCorrect) {
         resultDiv.innerHTML = `
             <div style="background: rgba(59, 199, 123, 0.2); border: 2px solid #3BC77B; border-radius: 8px; padding: 20px;">
                 <div style="font-size: 2.5rem; margin-bottom: 10px;">✅</div>
                 <div style="color: #3BC77B; font-size: 1.3rem; font-weight: bold; margin-bottom: 8px;">CORRECT!</div>
+                <img src="${championIconUrl}"
+                     alt="${correctChamp}"
+                     style="width: 60px; height: 60px; border-radius: 50%; border: 2px solid #3BC77B; margin-bottom: 10px;"
+                     onerror="this.style.display='none'">
                 <div style="color: #E4E1D8; font-size: 1.1rem; margin-bottom: 5px;">${correctChamp}</div>
                 <div style="color: #A09B8C; font-size: 0.95rem;">${gamesPlayed} games played</div>
             </div>
@@ -1855,6 +1865,10 @@ window.checkGuess = function(position, guessedChamp, correctChamp, gamesPlayed) 
                 <div style="font-size: 2.5rem; margin-bottom: 10px;">❌</div>
                 <div style="color: #C73B3B; font-size: 1.3rem; font-weight: bold; margin-bottom: 8px;">NOT QUITE!</div>
                 <div style="color: #E4E1D8; font-size: 0.95rem; margin-bottom: 5px;">The correct answer was:</div>
+                <img src="${championIconUrl}"
+                     alt="${correctChamp}"
+                     style="width: 60px; height: 60px; border-radius: 50%; border: 2px solid #3BC77B; margin: 10px 0;"
+                     onerror="this.style.display='none'">
                 <div style="color: #3BC77B; font-size: 1.1rem; font-weight: bold; margin-bottom: 5px;">${correctChamp}</div>
                 <div style="color: #A09B8C; font-size: 0.95rem;">${gamesPlayed} games played</div>
             </div>
